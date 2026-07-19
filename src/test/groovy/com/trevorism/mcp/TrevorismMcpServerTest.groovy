@@ -1,5 +1,6 @@
 package com.trevorism.mcp
 
+import com.trevorism.auth.ClaimsInspector
 import com.trevorism.client.PassThroughClient
 import com.trevorism.mcp.curated.CuratedToolRegistry
 import com.trevorism.model.ServiceEntry
@@ -35,8 +36,17 @@ class TrevorismMcpServerTest {
         }
     }
 
+    private static ClaimsInspector stubInspector() {
+        new ClaimsInspector() {
+            @Override
+            Map inspect(String accessToken) {
+                [subject: "me", role: "user", permissions: "CRE", tenant: "t1", accessToken: accessToken]
+            }
+        }
+    }
+
     private static TrevorismMcpServer server(ServiceRegistry r, SpecHarvester h, PassThroughClient p) {
-        new TrevorismMcpServer(r, h, p, new CuratedToolRegistry(p))
+        new TrevorismMcpServer(r, h, p, new CuratedToolRegistry(p), stubInspector())
     }
 
     @Test
@@ -51,11 +61,23 @@ class TrevorismMcpServerTest {
     void testToolsListHasMetaAndCuratedTools() {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
         def names = s.handle([jsonrpc: "2.0", id: 2, method: "tools/list"], "Bearer t").result.tools.collect { it.name }
-        // 4 meta tools
-        assert names.containsAll(["list_trevorism_services", "describe_service", "ping_service", "call_trevorism_api"])
+        // 5 meta tools (incl. whoami)
+        assert names.containsAll(["list_trevorism_services", "describe_service", "whoami", "ping_service", "call_trevorism_api"])
         // curated tools appended
         assert names.containsAll(["get_object", "create_object", "run_test_suite", "register_test_suite"])
-        assert names.size() == 15
+        assert names.size() == 16
+    }
+
+    @Test
+    void testWhoamiDecodesToken() {
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
+        Map response = s.handle([
+                jsonrpc: "2.0", id: 30, method: "tools/call",
+                params : [name: "whoami", arguments: [:]]], "Bearer abc")
+        def claims = new groovy.json.JsonSlurper().parseText(response.result.content[0].text)
+        assert claims.permissions == "CRE"
+        assert claims.role == "user"
+        assert claims.accessToken == "abc"   // resolved token (Bearer stripped) threaded to inspector
     }
 
     @Test

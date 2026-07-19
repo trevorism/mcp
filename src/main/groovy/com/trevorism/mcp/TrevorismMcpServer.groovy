@@ -1,5 +1,6 @@
 package com.trevorism.mcp
 
+import com.trevorism.auth.ClaimsInspector
 import com.trevorism.client.PassThroughClient
 import com.trevorism.mcp.curated.CuratedToolRegistry
 import com.trevorism.model.ServiceEntry
@@ -27,13 +28,16 @@ class TrevorismMcpServer {
     private final SpecHarvester specHarvester
     private final PassThroughClient passThroughClient
     private final CuratedToolRegistry curatedTools
+    private final ClaimsInspector claimsInspector
 
     TrevorismMcpServer(ServiceRegistry registry, SpecHarvester specHarvester,
-                       PassThroughClient passThroughClient, CuratedToolRegistry curatedTools) {
+                       PassThroughClient passThroughClient, CuratedToolRegistry curatedTools,
+                       ClaimsInspector claimsInspector) {
         this.registry = registry
         this.specHarvester = specHarvester
         this.passThroughClient = passThroughClient
         this.curatedTools = curatedTools
+        this.claimsInspector = claimsInspector
     }
 
     /**
@@ -96,6 +100,12 @@ class TrevorismMcpServer {
                                       required  : []]
                 ],
                 [
+                        name       : "whoami",
+                        description: "Show the caller's identity and permissions (subject, role, permissions, tenant) " +
+                                "decoded from the token. Authorization is enforced downstream by these permissions.",
+                        inputSchema: [type: "object", properties: [:], required: []]
+                ],
+                [
                         name       : "ping_service",
                         description: "Liveness check for a service: GET {baseUrl}/ping, expects 'pong'.",
                         inputSchema: [type: "object", properties: [baseUrl: [type: "string"]], required: ["baseUrl"]]
@@ -125,6 +135,12 @@ class TrevorismMcpServer {
             case "list_trevorism_services":
                 List services = registry.listServices(bearer).collect { (it as ServiceEntry).toMap() }
                 return PassThroughClient.toolText(JsonOutput.toJson(services))
+            case "whoami":
+                try {
+                    return PassThroughClient.toolText(JsonOutput.toJson(claimsInspector.inspect(bearer)))
+                } catch (Exception e) {
+                    return PassThroughClient.toolError("Could not decode token: ${e.message}")
+                }
             case "describe_service":
                 return describeService(args, bearer)
             case "ping_service":
