@@ -49,7 +49,7 @@ dependencies {
     implementation("org.apache.groovy:groovy-json")
     implementation("io.micronaut:micronaut-jackson-databind")
     implementation("io.micronaut.security:micronaut-security")
-    runtimeOnly("org.yaml:snakeyaml")
+    implementation("org.yaml:snakeyaml")
 
     implementation("jakarta.annotation:jakarta.annotation-api")
     implementation 'io.projectreactor:reactor-core:3.8.6'

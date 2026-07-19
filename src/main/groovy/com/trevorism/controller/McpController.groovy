@@ -3,11 +3,13 @@ package com.trevorism.controller
 import com.trevorism.mcp.TrevorismMcpServer
 import com.trevorism.secure.Roles
 import com.trevorism.secure.Secure
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
@@ -34,8 +36,8 @@ class McpController {
     @Operation(summary = "MCP JSON-RPC endpoint (initialize, tools/list, tools/call) **Secure")
     @Post(consumes = MediaType.APPLICATION_JSON, produces = MediaType.APPLICATION_JSON)
     @Secure(value = Roles.USER, allowInternal = true)
-    HttpResponse<?> rpc(@Body Map request) {
-        Map response = server.handle(request)
+    HttpResponse<?> rpc(@Body Map request, @Header(HttpHeaders.AUTHORIZATION) String authorization) {
+        Map response = server.handle(request, authorization)
         // Notifications get no body, per JSON-RPC.
         return response == null ? HttpResponse.accepted() : HttpResponse.ok(response)
     }

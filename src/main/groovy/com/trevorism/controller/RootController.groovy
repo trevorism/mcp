@@ -1,9 +1,16 @@
 package com.trevorism.controller
 
+import com.trevorism.secure.Roles
+import com.trevorism.secure.Secure
+import com.trevorism.service.ServiceRegistry
+import com.trevorism.service.SpecHarvester
+import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.Header
+import io.micronaut.http.annotation.Post
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -16,6 +23,14 @@ import org.slf4j.LoggerFactory
 class RootController {
 
     private static final Logger log = LoggerFactory.getLogger(RootController)
+
+    private final ServiceRegistry serviceRegistry
+    private final SpecHarvester specHarvester
+
+    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester) {
+        this.serviceRegistry = serviceRegistry
+        this.specHarvester = specHarvester
+    }
 
     @Tag(name = "Root Operations")
     @Operation(summary = "Context Root of the Application")
@@ -58,5 +73,17 @@ class RootController {
     @Get(value = "/version", produces = MediaType.TEXT_PLAIN)
     String version() {
         return "0-1-0"
+    }
+
+    @Tag(name = "Root Operations")
+    @Operation(summary = "Force a rebuild of the service registry and spec caches **Secure")
+    @Post(value = "/refresh", produces = MediaType.APPLICATION_JSON)
+    @Secure(value = Roles.USER, allowInternal = true)
+    Map refresh(@Header(HttpHeaders.AUTHORIZATION) String authorization) {
+        String bearer = authorization?.toLowerCase()?.startsWith("bearer ") ? authorization.substring(7).trim() : authorization?.trim()
+        specHarvester.clear()
+        int count = serviceRegistry.refresh(bearer).size()
+        log.info("Manual refresh resolved ${count} services")
+        return [services: count]
     }
 }

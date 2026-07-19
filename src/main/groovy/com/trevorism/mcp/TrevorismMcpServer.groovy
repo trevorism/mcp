@@ -1,33 +1,42 @@
 package com.trevorism.mcp
 
-import com.trevorism.https.SecureHttpClient
+import com.trevorism.client.PassThroughClient
+import com.trevorism.model.ServiceEntry
+import com.trevorism.service.ServiceRegistry
+import com.trevorism.service.SpecHarvester
 import groovy.json.JsonOutput
-import org.apache.hc.client5.http.HttpResponseException
+import jakarta.inject.Singleton
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 /**
  * Hand-rolled MCP server core (tools-only). Speaks JSON-RPC 2.0; the transport
- * (McpController) is responsible only for HTTP framing. Every downstream call goes
- * through the request-scoped pass-through client, so it carries the caller's JWT.
+ * (McpController) is responsible only for HTTP framing.
+ *
+ * The caller's bearer token is threaded in from the controller: discovery tools use it for the
+ * @Secure category lookups, while ping/call go through the request-scoped pass-through client.
  */
-@jakarta.inject.Singleton
+@Singleton
 class TrevorismMcpServer {
 
     private static final Logger log = LoggerFactory.getLogger(TrevorismMcpServer)
     private static final String PROTOCOL_VERSION = "2025-03-26"
 
-    private final SecureHttpClient httpClient
+    private final ServiceRegistry registry
+    private final SpecHarvester specHarvester
+    private final PassThroughClient passThroughClient
 
-    TrevorismMcpServer(SecureHttpClient passThruSecureHttpClient) {
-        this.httpClient = passThruSecureHttpClient
+    TrevorismMcpServer(ServiceRegistry registry, SpecHarvester specHarvester, PassThroughClient passThroughClient) {
+        this.registry = registry
+        this.specHarvester = specHarvester
+        this.passThroughClient = passThroughClient
     }
 
     /**
-     * Handle a single JSON-RPC request. Returns the response Map, or {@code null}
-     * for notifications (which get no reply).
+     * Handle a single JSON-RPC request. {@code bearer} is the caller's raw JWT (no "Bearer " prefix
+     * required — accepted either way). Returns the response Map, or {@code null} for notifications.
      */
-    Map handle(Map request) {
+    Map handle(Map request, String bearer) {
         String method = request?.method
         if (!method) {
             return error(request?.id, -32600, "Invalid Request: missing method")
@@ -43,7 +52,7 @@ class TrevorismMcpServer {
                 case "tools/list":
                     return result(id, [tools: toolDefinitions()])
                 case "tools/call":
-                    return result(id, callTool(request.params as Map))
+                    return result(id, callTool(request.params as Map, stripBearer(bearer)))
                 default:
                     if (method.startsWith("notifications/")) {
                         return null
@@ -68,8 +77,19 @@ class TrevorismMcpServer {
         [
                 [
                         name       : "list_trevorism_services",
-                        description: "List discoverable Trevorism platform services with base URLs.",
+                        description: "List discoverable Trevorism platform services with resolved base URLs.",
                         inputSchema: [type: "object", properties: [:], required: []]
+                ],
+                [
+                        name       : "describe_service",
+                        description: "Summarize a service's API operations (method, path, whether it needs auth) " +
+                                "from its OpenAPI spec. Give a service name, or a baseUrl directly.",
+                        inputSchema: [type      : "object",
+                                      properties: [
+                                              name   : [type: "string", description: "Service name, e.g. 'data'"],
+                                              baseUrl: [type: "string", description: "Base URL (alternative to name)"]
+                                      ],
+                                      required  : []]
                 ],
                 [
                         name       : "ping_service",
@@ -91,52 +111,43 @@ class TrevorismMcpServer {
         ]
     }
 
-    private Map callTool(Map params) {
+    private Map callTool(Map params, String bearer) {
         String name = params?.name
         Map args = (params?.arguments ?: [:]) as Map
         switch (name) {
             case "list_trevorism_services":
-                // Spike: hardcoded. Phase 3 replaces this with ServiceRegistry (active endpoint).
-                return toolText(JsonOutput.toJson([
-                        [name: "data", baseUrl: "https://data.trevorism.com", summary: "Data access facade"],
-                        [name: "testing", baseUrl: "https://testing.trevorism.com", summary: "Test suite registry"]
-                ]))
+                List services = registry.listServices(bearer).collect { (it as ServiceEntry).toMap() }
+                return PassThroughClient.toolText(JsonOutput.toJson(services))
+            case "describe_service":
+                return describeService(args, bearer)
             case "ping_service":
-                return callApi("GET", "${args.baseUrl}/ping", null)
+                return passThroughClient.callApi("GET", "${args.baseUrl}/ping", null)
             case "call_trevorism_api":
                 String url = "${args.baseUrl}${args.path}"
-                return callApi((args.method ?: "GET").toString().toUpperCase(), url, args.body as String)
+                return passThroughClient.callApi((args.method ?: "GET") as String, url, args.body as String)
             default:
-                return toolError("Unknown tool: ${name}")
+                return PassThroughClient.toolError("Unknown tool: ${name}")
         }
     }
 
-    /** Perform the downstream call via the pass-through client (caller's JWT is attached). */
-    private Map callApi(String method, String url, String body) {
-        try {
-            String response
-            switch (method) {
-                case "GET": response = httpClient.get(url); break
-                case "POST": response = httpClient.post(url, body ?: ""); break
-                case "PUT": response = httpClient.put(url, body ?: ""); break
-                case "DELETE": response = httpClient.delete(url); break
-                default: return toolError("Unsupported method: ${method}")
+    private Map describeService(Map args, String bearer) {
+        String baseUrl = args.baseUrl as String
+        if (!baseUrl && args.name) {
+            ServiceEntry entry = registry.byName(args.name as String, bearer)
+            if (!entry) {
+                return PassThroughClient.toolError("Unknown service: ${args.name}")
             }
-            return toolText(response)
-        } catch (HttpResponseException e) {
-            // Surface downstream status (e.g. 401 on an expired/absent user token) clearly.
-            return toolError("Downstream ${e.statusCode}: ${e.message}")
-        } catch (Exception e) {
-            return toolError("Call failed: ${e.message}")
+            baseUrl = entry.baseUrl
         }
+        if (!baseUrl) {
+            return PassThroughClient.toolError("describe_service requires 'name' or 'baseUrl'")
+        }
+        return PassThroughClient.toolText(JsonOutput.toJson(specHarvester.describe(baseUrl)))
     }
 
-    private static Map toolText(String text) {
-        [content: [[type: "text", text: text ?: ""]], isError: false]
-    }
-
-    private static Map toolError(String text) {
-        [content: [[type: "text", text: text ?: ""]], isError: true]
+    private static String stripBearer(String bearer) {
+        if (!bearer) return bearer
+        return bearer.toLowerCase().startsWith("bearer ") ? bearer.substring(7).trim() : bearer.trim()
     }
 
     private static Map result(id, Object payload) {
