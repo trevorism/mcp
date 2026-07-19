@@ -121,10 +121,10 @@ class TrevorismMcpServer {
             case "describe_service":
                 return describeService(args, bearer)
             case "ping_service":
-                return passThroughClient.callApi("GET", "${args.baseUrl}/ping", null)
+                return passThroughClient.callApi("GET", "${args.baseUrl}/ping", null, bearer)
             case "call_trevorism_api":
                 String url = "${args.baseUrl}${args.path}"
-                return passThroughClient.callApi((args.method ?: "GET") as String, url, args.body as String)
+                return passThroughClient.callApi((args.method ?: "GET") as String, url, args.body as String, bearer)
             default:
                 return PassThroughClient.toolError("Unknown tool: ${name}")
         }

@@ -1,9 +1,9 @@
 package com.trevorism.controller
 
-import com.trevorism.secure.Roles
-import com.trevorism.secure.Secure
+import com.trevorism.auth.TokenManager
 import com.trevorism.service.ServiceRegistry
 import com.trevorism.service.SpecHarvester
+import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -26,10 +26,12 @@ class RootController {
 
     private final ServiceRegistry serviceRegistry
     private final SpecHarvester specHarvester
+    private final TokenManager tokenManager
 
-    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester) {
+    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester, TokenManager tokenManager) {
         this.serviceRegistry = serviceRegistry
         this.specHarvester = specHarvester
+        this.tokenManager = tokenManager
     }
 
     @Tag(name = "Root Operations")
@@ -72,17 +74,19 @@ class RootController {
     )
     @Get(value = "/version", produces = MediaType.TEXT_PLAIN)
     String version() {
-        return "0-1-0"
+        return "0-2-0"
     }
 
     @Tag(name = "Root Operations")
-    @Operation(summary = "Force a rebuild of the service registry and spec caches **Secure")
+    @Operation(summary = "Force a rebuild of the service registry and spec caches")
     @Post(value = "/refresh", produces = MediaType.APPLICATION_JSON)
-    @Secure(value = Roles.USER, allowInternal = true)
-    Map refresh(@Header(HttpHeaders.AUTHORIZATION) String authorization) {
-        String bearer = authorization?.toLowerCase()?.startsWith("bearer ") ? authorization.substring(7).trim() : authorization?.trim()
+    Map refresh(@Header(HttpHeaders.AUTHORIZATION) @Nullable String authorization) {
+        String accessToken = tokenManager.resolveAccessToken(authorization)
+        if (!accessToken) {
+            return [error: "Missing or invalid Authorization bearer token"]
+        }
         specHarvester.clear()
-        int count = serviceRegistry.refresh(bearer).size()
+        int count = serviceRegistry.refresh(accessToken).size()
         log.info("Manual refresh resolved ${count} services")
         return [services: count]
     }

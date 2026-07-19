@@ -1,7 +1,6 @@
 package com.trevorism.mcp
 
 import com.trevorism.client.PassThroughClient
-import com.trevorism.https.SecureHttpClient
 import com.trevorism.model.ServiceEntry
 import com.trevorism.service.ServiceRegistry
 import com.trevorism.service.SpecHarvester
@@ -26,12 +25,13 @@ class TrevorismMcpServerTest {
     }
 
     private static PassThroughClient recordingPassThrough(List calls) {
-        // Real PassThroughClient over a duck-typed client that records the downstream call.
-        def client = [
-                get : { String url -> calls << [method: "GET", url: url]; "ok" },
-                post: { String url, String body -> calls << [method: "POST", url: url, body: body]; "ok" }
-        ] as SecureHttpClient
-        return new PassThroughClient(client)
+        new PassThroughClient() {
+            @Override
+            Map callApi(String method, String url, String body, String accessToken) {
+                calls << [method: method, url: url, body: body, accessToken: accessToken]
+                return PassThroughClient.toolText("ok")
+            }
+        }
     }
 
     private static TrevorismMcpServer server(ServiceRegistry r, SpecHarvester h, PassThroughClient p) {
@@ -95,6 +95,7 @@ class TrevorismMcpServerTest {
                           arguments: [baseUrl: "https://data.trevorism.com", method: "GET", path: "/object/"]]], "Bearer tok")
         assert calls[0].method == "GET"
         assert calls[0].url == "https://data.trevorism.com/object/"
+        assert calls[0].accessToken == "tok"   // Bearer prefix stripped, resolved token threaded through
     }
 
     @Test

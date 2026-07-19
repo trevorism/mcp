@@ -11,7 +11,7 @@ import org.slf4j.LoggerFactory
 @OpenAPIDefinition(
         info = @Info(
                 title = "Mcp",
-                version = "0.1.0",
+                version = "0.2.0",
                 description = "MCP control plane exposing Trevorism as agent-callable tools",
                 contact = @Contact(url = "https://trevorism.com", name = "Trevor Brooks", email = "tbrooks@trevorism.com")
         )
