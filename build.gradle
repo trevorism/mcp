@@ -46,6 +46,7 @@ dependencies {
     annotationProcessor("io.micronaut.validation:micronaut-validation-processor")
 
     implementation("io.micronaut.groovy:micronaut-runtime-groovy")
+    implementation("org.apache.groovy:groovy-json")
     implementation("io.micronaut:micronaut-jackson-databind")
     implementation("io.micronaut.security:micronaut-security")
     runtimeOnly("org.yaml:snakeyaml")
@@ -59,6 +60,8 @@ dependencies {
     }
 
     runtimeOnly("ch.qos.logback:logback-classic")
+
+    implementation('com.trevorism:micronaut-utility-beans:2.0.0')
 
     testImplementation 'com.trevorism:test-result-events:0.3.0'
     acceptanceImplementation 'io.cucumber:cucumber-groovy:6.10.4'
