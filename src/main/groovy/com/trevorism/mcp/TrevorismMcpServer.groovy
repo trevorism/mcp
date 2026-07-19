@@ -1,6 +1,7 @@
 package com.trevorism.mcp
 
 import com.trevorism.client.PassThroughClient
+import com.trevorism.mcp.curated.CuratedToolRegistry
 import com.trevorism.model.ServiceEntry
 import com.trevorism.service.ServiceRegistry
 import com.trevorism.service.SpecHarvester
@@ -25,11 +26,14 @@ class TrevorismMcpServer {
     private final ServiceRegistry registry
     private final SpecHarvester specHarvester
     private final PassThroughClient passThroughClient
+    private final CuratedToolRegistry curatedTools
 
-    TrevorismMcpServer(ServiceRegistry registry, SpecHarvester specHarvester, PassThroughClient passThroughClient) {
+    TrevorismMcpServer(ServiceRegistry registry, SpecHarvester specHarvester,
+                       PassThroughClient passThroughClient, CuratedToolRegistry curatedTools) {
         this.registry = registry
         this.specHarvester = specHarvester
         this.passThroughClient = passThroughClient
+        this.curatedTools = curatedTools
     }
 
     /**
@@ -50,7 +54,7 @@ class TrevorismMcpServer {
                 case "ping":
                     return result(id, [:])
                 case "tools/list":
-                    return result(id, [tools: toolDefinitions()])
+                    return result(id, [tools: toolDefinitions() + curatedTools.toolDefinitions()])
                 case "tools/call":
                     return result(id, callTool(request.params as Map, stripBearer(bearer)))
                 default:
@@ -114,6 +118,9 @@ class TrevorismMcpServer {
     private Map callTool(Map params, String bearer) {
         String name = params?.name
         Map args = (params?.arguments ?: [:]) as Map
+        if (curatedTools.handles(name)) {
+            return curatedTools.call(name, args, bearer)
+        }
         switch (name) {
             case "list_trevorism_services":
                 List services = registry.listServices(bearer).collect { (it as ServiceEntry).toMap() }

@@ -1,6 +1,7 @@
 package com.trevorism.mcp
 
 import com.trevorism.client.PassThroughClient
+import com.trevorism.mcp.curated.CuratedToolRegistry
 import com.trevorism.model.ServiceEntry
 import com.trevorism.service.ServiceRegistry
 import com.trevorism.service.SpecHarvester
@@ -35,7 +36,7 @@ class TrevorismMcpServerTest {
     }
 
     private static TrevorismMcpServer server(ServiceRegistry r, SpecHarvester h, PassThroughClient p) {
-        new TrevorismMcpServer(r, h, p)
+        new TrevorismMcpServer(r, h, p, new CuratedToolRegistry(p))
     }
 
     @Test
@@ -47,10 +48,26 @@ class TrevorismMcpServerTest {
     }
 
     @Test
-    void testToolsListHasFourTools() {
+    void testToolsListHasMetaAndCuratedTools() {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
         def names = s.handle([jsonrpc: "2.0", id: 2, method: "tools/list"], "Bearer t").result.tools.collect { it.name }
+        // 4 meta tools
         assert names.containsAll(["list_trevorism_services", "describe_service", "ping_service", "call_trevorism_api"])
+        // curated tools appended
+        assert names.containsAll(["get_object", "create_object", "run_test_suite", "register_test_suite"])
+        assert names.size() == 15
+    }
+
+    @Test
+    void testCuratedToolRoutesThroughPassThrough() {
+        List calls = []
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough(calls))
+        s.handle([
+                jsonrpc: "2.0", id: 20, method: "tools/call",
+                params : [name: "get_object", arguments: [kind: "app", id: "42"]]], "Bearer tok")
+        assert calls[0].method == "GET"
+        assert calls[0].url == "https://data.trevorism.com/object/app/42"
+        assert calls[0].accessToken == "tok"
     }
 
     @Test
