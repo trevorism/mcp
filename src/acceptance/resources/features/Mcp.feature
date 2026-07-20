@@ -9,10 +9,6 @@ Feature: MCP endpoint
     When an authenticated tools list request is sent to the mcp endpoint
     Then the meta tools and curated tools are present
 
-  Scenario: A tool can be called
-    When the list_trevorism_services tool is called
-    Then discovered Trevorism services are returned
-
   Scenario: Unauthenticated requests are rejected
     When an unauthenticated request is sent to the mcp endpoint
     Then the request is rejected

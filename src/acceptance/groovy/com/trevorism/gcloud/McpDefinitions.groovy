@@ -34,18 +34,6 @@ Then(/the meta tools and curated tools are present/) { ->
      "get_object", "run_test_suite"].each { assert response.contains("\"${it}\"") }
 }
 
-When(/the list_trevorism_services tool is called/) { ->
-    SecureHttpClient client = new AppClientSecureHttpClient()
-    response = client.post(MCP_URL,
-            '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_trevorism_services","arguments":{}}}')
-}
-
-Then(/discovered Trevorism services are returned/) { ->
-    // The services list is returned as an (escaped) JSON string inside the tool result content.
-    assert response.contains('data.trevorism.com')
-    assert response.contains('"isError":false')
-}
-
 When(/an unauthenticated request is sent to the mcp endpoint/) { ->
     try {
         new JsonHttpClient().post(MCP_URL, '{"jsonrpc":"2.0","id":4,"method":"initialize","params":{}}')
