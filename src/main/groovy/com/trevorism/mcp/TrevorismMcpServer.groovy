@@ -23,7 +23,10 @@ import org.slf4j.LoggerFactory
 class TrevorismMcpServer {
 
     private static final Logger log = LoggerFactory.getLogger(TrevorismMcpServer)
-    private static final String PROTOCOL_VERSION = "2025-03-26"
+    private static final String PROTOCOL_VERSION = "2025-06-18"
+    // Versions we can speak. On initialize we echo the client's requested version if we support it,
+    // otherwise we advertise our latest (PROTOCOL_VERSION) and let the client decide.
+    private static final Set<String> SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"].toSet()
 
     private final ServiceRegistry registry
     private final SpecHarvester specHarvester
@@ -56,7 +59,7 @@ class TrevorismMcpServer {
         try {
             switch (method) {
                 case "initialize":
-                    return result(id, initialize())
+                    return result(id, initialize(request.params as Map))
                 case "ping":
                     return result(id, [:])
                 case "tools/list":
@@ -75,12 +78,19 @@ class TrevorismMcpServer {
         }
     }
 
-    private static Map initialize() {
+    private static Map initialize(Map params) {
+        String requested = params?.protocolVersion as String
+        String negotiated = (requested && SUPPORTED_VERSIONS.contains(requested)) ? requested : PROTOCOL_VERSION
         [
-                protocolVersion: PROTOCOL_VERSION,
+                protocolVersion: negotiated,
                 capabilities   : [tools: [listChanged: false]],
-                serverInfo     : [name: "trevorism-mcp", version: "0-4-0"]
+                serverInfo     : [name: "trevorism-mcp", version: "0.4.0"]
         ]
+    }
+
+    /** A read-only tool that reaches out to external services. */
+    private static Map readOnly(String title) {
+        [title: title, readOnlyHint: true, openWorldHint: true]
     }
 
     private static List<Map> toolDefinitions() {
@@ -88,7 +98,8 @@ class TrevorismMcpServer {
                 [
                         name       : "list_trevorism_services",
                         description: "List discoverable Trevorism platform services with resolved base URLs.",
-                        inputSchema: [type: "object", properties: [:], required: []]
+                        inputSchema: [type: "object", properties: [:], required: []],
+                        annotations: readOnly("List services")
                 ],
                 [
                         name       : "describe_service",
@@ -99,18 +110,22 @@ class TrevorismMcpServer {
                                               name   : [type: "string", description: "Service name, e.g. 'data'"],
                                               baseUrl: [type: "string", description: "Base URL (alternative to name)"]
                                       ],
-                                      required  : []]
+                                      required  : []],
+                        annotations: readOnly("Describe service")
                 ],
                 [
                         name       : "whoami",
                         description: "Show the caller's identity and permissions (subject, role, permissions, tenant) " +
                                 "decoded from the token. Authorization is enforced downstream by these permissions.",
-                        inputSchema: [type: "object", properties: [:], required: []]
+                        inputSchema: [type: "object", properties: [:], required: []],
+                        // Decodes the token locally — no external interaction.
+                        annotations: [title: "Who am I", readOnlyHint: true, openWorldHint: false]
                 ],
                 [
                         name       : "ping_service",
                         description: "Liveness check for a service: GET {baseUrl}/ping, expects 'pong'.",
-                        inputSchema: [type: "object", properties: [baseUrl: [type: "string"]], required: ["baseUrl"]]
+                        inputSchema: [type: "object", properties: [baseUrl: [type: "string"]], required: ["baseUrl"]],
+                        annotations: readOnly("Ping service")
                 ],
                 [
                         name       : "call_trevorism_api",
@@ -122,7 +137,9 @@ class TrevorismMcpServer {
                                               path   : [type: "string"],
                                               body   : [type: "string", description: "JSON body for POST/PUT"]
                                       ],
-                                      required  : ["baseUrl", "method", "path"]]
+                                      required  : ["baseUrl", "method", "path"]],
+                        // Generic escape hatch: it can issue any method, so treat it as potentially destructive.
+                        annotations: [title: "Call Trevorism API", readOnlyHint: false, destructiveHint: true, openWorldHint: true]
                 ]
         ]
     }

@@ -18,8 +18,11 @@ class CuratedTool {
     List<String> queryParams = []  // optional query args appended when present (e.g. ["datasource"])
     String bodyObjectArg           // an arg whose value IS the JSON body object (or null)
     List<String> bodyFromArgs      // arg names assembled into the JSON body map (or null)
+    Map annotations                // MCP tool behavior hints (readOnlyHint/destructiveHint/idempotentHint/...)
 
     Map toDefinition() {
-        [name: name, description: description, inputSchema: inputSchema]
+        Map definition = [name: name, description: description, inputSchema: inputSchema]
+        if (annotations) definition.annotations = annotations
+        return definition
     }
 }

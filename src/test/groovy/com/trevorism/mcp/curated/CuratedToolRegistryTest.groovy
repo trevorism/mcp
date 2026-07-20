@@ -31,6 +31,16 @@ class CuratedToolRegistryTest {
     }
 
     @Test
+    void testMutatingToolsCarryDestructiveAnnotations() {
+        def defs = reg(new Recorder()).toolDefinitions().collectEntries { [(it.name): it] }
+        assert defs.get_object.annotations.readOnlyHint == true
+        assert defs.query_data.annotations.readOnlyHint == true
+        assert defs.delete_object.annotations.readOnlyHint == false
+        assert defs.delete_object.annotations.destructiveHint == true
+        assert defs.create_object.annotations.destructiveHint == false
+    }
+
+    @Test
     void testHandles() {
         def r = reg(new Recorder())
         assert r.handles("run_test_suite")

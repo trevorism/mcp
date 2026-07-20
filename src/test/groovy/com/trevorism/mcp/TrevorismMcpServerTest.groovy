@@ -53,8 +53,25 @@ class TrevorismMcpServerTest {
     void testInitialize() {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
         Map response = s.handle([jsonrpc: "2.0", id: 1, method: "initialize", params: [:]], "Bearer t")
-        assert response.result.protocolVersion == "2025-03-26"
+        assert response.result.protocolVersion == "2025-06-18"
         assert response.result.serverInfo.name == "trevorism-mcp"
+    }
+
+    @Test
+    void testInitializeEchoesSupportedRequestedVersion() {
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
+        Map response = s.handle([jsonrpc: "2.0", id: 1, method: "initialize",
+                                 params : [protocolVersion: "2025-03-26"]], "Bearer t")
+        // We speak 2025-03-26, so we honor the client's request rather than forcing our latest.
+        assert response.result.protocolVersion == "2025-03-26"
+    }
+
+    @Test
+    void testInitializeFallsBackForUnknownVersion() {
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
+        Map response = s.handle([jsonrpc: "2.0", id: 1, method: "initialize",
+                                 params : [protocolVersion: "1999-01-01"]], "Bearer t")
+        assert response.result.protocolVersion == "2025-06-18"
     }
 
     @Test

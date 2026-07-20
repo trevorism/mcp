@@ -97,65 +97,79 @@ class CuratedToolRegistry {
         return p
     }
 
+    /** Read-only tool that reaches out to a downstream service. */
+    private static Map readOnly(String title) {
+        [title: title, readOnlyHint: true, openWorldHint: true]
+    }
+
+    /** Mutating tool: {@code destructive} = may overwrite/remove data; {@code idempotent} = repeat is a no-op. */
+    private static Map writes(String title, boolean destructive, boolean idempotent) {
+        [title: title, readOnlyHint: false, destructiveHint: destructive, idempotentHint: idempotent, openWorldHint: true]
+    }
+
     private static List<CuratedTool> buildTools() {
         Map datasource = stringProp("Optional datasource (default datastore)", DATASOURCES)
         [
                 // ---- Data (data.trevorism.com) ----
                 new CuratedTool(
                         name: "list_object_types", baseUrl: DATA, method: "GET", pathTemplate: "/object",
-                        description: "List all object types (kinds) available in the data service. **Secure",
-                        queryParams: ["datasource"],
+                        description: "List all object types (kinds) available in the data service.",
+                        queryParams: ["datasource"], annotations: readOnly("List object types"),
                         inputSchema: [type: "object", properties: [datasource: datasource], required: []]),
                 new CuratedTool(
                         name: "get_objects", baseUrl: DATA, method: "GET", pathTemplate: "/object/{kind}",
-                        description: "Get all objects of a given type/kind. **Secure",
-                        pathParams: ["kind"], queryParams: ["datasource"],
+                        description: "Get all objects of a given type/kind.",
+                        pathParams: ["kind"], queryParams: ["datasource"], annotations: readOnly("Get objects"),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), datasource: datasource], required: ["kind"]]),
                 new CuratedTool(
                         name: "get_object", baseUrl: DATA, method: "GET", pathTemplate: "/object/{kind}/{id}",
-                        description: "Get a single object of type {kind} by its id. **Secure",
-                        pathParams: ["kind", "id"], queryParams: ["datasource"],
+                        description: "Get a single object of type {kind} by its id.",
+                        pathParams: ["kind", "id"], queryParams: ["datasource"], annotations: readOnly("Get object"),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), id: stringProp("Object id"), datasource: datasource], required: ["kind", "id"]]),
                 new CuratedTool(
                         name: "create_object", baseUrl: DATA, method: "POST", pathTemplate: "/object/{kind}",
-                        description: "Create an object of type {kind}. **Secure",
+                        description: "Create an object of type {kind}.",
                         pathParams: ["kind"], queryParams: ["datasource"], bodyObjectArg: "data",
+                        annotations: writes("Create object", false, false),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), data: objectSchema("The object to create"), datasource: datasource], required: ["kind", "data"]]),
                 new CuratedTool(
                         name: "update_object", baseUrl: DATA, method: "PUT", pathTemplate: "/object/{kind}/{id}",
-                        description: "Update the object of type {kind} with id {id}. **Secure",
+                        description: "Update the object of type {kind} with id {id}.",
                         pathParams: ["kind", "id"], queryParams: ["datasource"], bodyObjectArg: "data",
+                        annotations: writes("Update object", true, true),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), id: stringProp("Object id"), data: objectSchema("The updated object"), datasource: datasource], required: ["kind", "id", "data"]]),
                 new CuratedTool(
                         name: "delete_object", baseUrl: DATA, method: "DELETE", pathTemplate: "/object/{kind}/{id}",
-                        description: "Delete the object of type {kind} with id {id}. **Secure",
+                        description: "Delete the object of type {kind} with id {id}.",
                         pathParams: ["kind", "id"], queryParams: ["datasource"],
+                        annotations: writes("Delete object", true, true),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), id: stringProp("Object id"), datasource: datasource], required: ["kind", "id"]]),
                 new CuratedTool(
                         name: "query_data", baseUrl: DATA, method: "POST", pathTemplate: "/query",
-                        description: "Run a data query and get results. Pass the query specification object. **Secure",
-                        queryParams: ["datasource"], bodyObjectArg: "query",
+                        description: "Run a data query and get results. Pass the query specification object.",
+                        queryParams: ["datasource"], bodyObjectArg: "query", annotations: readOnly("Query data"),
                         inputSchema: [type: "object", properties: [query: objectSchema("The query specification"), datasource: datasource], required: ["query"]]),
 
                 // ---- Testing (testing.trevorism.com) ----
                 new CuratedTool(
                         name: "list_test_suites", baseUrl: TESTING, method: "GET", pathTemplate: "/api/suite",
-                        description: "List all registered test suites and their last-run status. **Secure",
+                        description: "List all registered test suites and their last-run status.",
+                        annotations: readOnly("List test suites"),
                         inputSchema: [type: "object", properties: [:], required: []]),
                 new CuratedTool(
                         name: "get_test_suite", baseUrl: TESTING, method: "GET", pathTemplate: "/api/suite/{id}",
-                        description: "Get a registered test suite by its id. **Secure",
-                        pathParams: ["id"],
+                        description: "Get a registered test suite by its id.",
+                        pathParams: ["id"], annotations: readOnly("Get test suite"),
                         inputSchema: [type: "object", properties: [id: stringProp("Test suite id")], required: ["id"]]),
                 new CuratedTool(
                         name: "run_test_suite", baseUrl: TESTING, method: "POST", pathTemplate: "/api/suite/{id}",
-                        description: "Invoke (run) the registered test suite with the given id. **Secure",
-                        pathParams: ["id"],
+                        description: "Invoke (run) the registered test suite with the given id.",
+                        pathParams: ["id"], annotations: writes("Run test suite", false, false),
                         inputSchema: [type: "object", properties: [id: stringProp("Test suite id")], required: ["id"]]),
                 new CuratedTool(
                         name: "register_test_suite", baseUrl: TESTING, method: "POST", pathTemplate: "/api/suite",
-                        description: "Register a new test suite. 'source' must equal the repo name. **Secure",
-                        bodyFromArgs: ["name", "source", "kind"],
+                        description: "Register a new test suite. 'source' must equal the repo name.",
+                        bodyFromArgs: ["name", "source", "kind"], annotations: writes("Register test suite", false, false),
                         inputSchema: [type: "object", properties: [
                                 name  : stringProp("Suite name"),
                                 source: stringProp("Repo name (used for dispatch + event matching)"),
