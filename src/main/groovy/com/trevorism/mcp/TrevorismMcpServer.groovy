@@ -6,6 +6,7 @@ import com.trevorism.mcp.curated.CuratedToolRegistry
 import com.trevorism.model.ServiceEntry
 import com.trevorism.service.ServiceRegistry
 import com.trevorism.service.SpecHarvester
+import com.trevorism.util.HostAllowlist
 import groovy.json.JsonOutput
 import jakarta.inject.Singleton
 import org.slf4j.Logger
@@ -41,10 +42,11 @@ class TrevorismMcpServer {
     }
 
     /**
-     * Handle a single JSON-RPC request. {@code bearer} is the caller's raw JWT (no "Bearer " prefix
-     * required — accepted either way). Returns the response Map, or {@code null} for notifications.
+     * Handle a single JSON-RPC request. {@code accessToken} is the caller's resolved access token
+     * (already stripped of any "Bearer " prefix by the controller's TokenManager). Returns the response
+     * Map, or {@code null} for notifications.
      */
-    Map handle(Map request, String bearer) {
+    Map handle(Map request, String accessToken) {
         String method = request?.method
         if (!method) {
             return error(request?.id, -32600, "Invalid Request: missing method")
@@ -60,7 +62,7 @@ class TrevorismMcpServer {
                 case "tools/list":
                     return result(id, [tools: toolDefinitions() + curatedTools.toolDefinitions()])
                 case "tools/call":
-                    return result(id, callTool(request.params as Map, stripBearer(bearer)))
+                    return result(id, callTool(request.params as Map, accessToken))
                 default:
                     if (method.startsWith("notifications/")) {
                         return null
@@ -77,7 +79,7 @@ class TrevorismMcpServer {
         [
                 protocolVersion: PROTOCOL_VERSION,
                 capabilities   : [tools: [listChanged: false]],
-                serverInfo     : [name: "trevorism-mcp", version: "0-1-0"]
+                serverInfo     : [name: "trevorism-mcp", version: "0-4-0"]
         ]
     }
 
@@ -165,12 +167,10 @@ class TrevorismMcpServer {
         if (!baseUrl) {
             return PassThroughClient.toolError("describe_service requires 'name' or 'baseUrl'")
         }
+        if (!HostAllowlist.isAllowed(baseUrl)) {
+            return PassThroughClient.toolError("Refused: '${baseUrl}' is not a Trevorism (*.trevorism.com) host")
+        }
         return PassThroughClient.toolText(JsonOutput.toJson(specHarvester.describe(baseUrl)))
-    }
-
-    private static String stripBearer(String bearer) {
-        if (!bearer) return bearer
-        return bearer.toLowerCase().startsWith("bearer ") ? bearer.substring(7).trim() : bearer.trim()
     }
 
     private static Map result(id, Object payload) {

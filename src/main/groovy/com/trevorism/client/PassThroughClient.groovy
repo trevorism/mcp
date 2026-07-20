@@ -2,6 +2,7 @@ package com.trevorism.client
 
 import com.trevorism.http.JsonHttpClient
 import com.trevorism.http.util.InvalidRequestException
+import com.trevorism.util.HostAllowlist
 import jakarta.inject.Singleton
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -22,6 +23,11 @@ class PassThroughClient {
     private final JsonHttpClient http = new JsonHttpClient()
 
     Map callApi(String method, String url, String body, String accessToken) {
+        // Never forward the caller's token to a non-Trevorism host (confused-deputy / exfiltration guard).
+        if (!HostAllowlist.isAllowed(url)) {
+            log.warn("Refusing to forward token to non-Trevorism host: ${url}")
+            return toolError("Refused: '${url}' is not a Trevorism (*.trevorism.com) host")
+        }
         Map<String, String> headers = ["Authorization": "Bearer ${accessToken}".toString()]
         try {
             String response

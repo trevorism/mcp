@@ -73,11 +73,11 @@ class TrevorismMcpServerTest {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
         Map response = s.handle([
                 jsonrpc: "2.0", id: 30, method: "tools/call",
-                params : [name: "whoami", arguments: [:]]], "Bearer abc")
+                params : [name: "whoami", arguments: [:]]], "abc")
         def claims = new groovy.json.JsonSlurper().parseText(response.result.content[0].text)
         assert claims.permissions == "CRE"
         assert claims.role == "user"
-        assert claims.accessToken == "abc"   // resolved token (Bearer stripped) threaded to inspector
+        assert claims.accessToken == "abc"   // resolved access token threaded to inspector
     }
 
     @Test
@@ -86,7 +86,7 @@ class TrevorismMcpServerTest {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough(calls))
         s.handle([
                 jsonrpc: "2.0", id: 20, method: "tools/call",
-                params : [name: "get_object", arguments: [kind: "app", id: "42"]]], "Bearer tok")
+                params : [name: "get_object", arguments: [kind: "app", id: "42"]]], "tok")
         assert calls[0].method == "GET"
         assert calls[0].url == "https://data.trevorism.com/object/app/42"
         assert calls[0].accessToken == "tok"
@@ -128,13 +128,24 @@ class TrevorismMcpServerTest {
     void testCallTrevorismApiDelegatesToPassThrough() {
         List calls = []
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough(calls))
+        // handle() receives the already-resolved access token from the controller (no "Bearer " prefix).
         s.handle([
                 jsonrpc: "2.0", id: 6, method: "tools/call",
                 params : [name: "call_trevorism_api",
-                          arguments: [baseUrl: "https://data.trevorism.com", method: "GET", path: "/object/"]]], "Bearer tok")
+                          arguments: [baseUrl: "https://data.trevorism.com", method: "GET", path: "/object/"]]], "tok")
         assert calls[0].method == "GET"
         assert calls[0].url == "https://data.trevorism.com/object/"
-        assert calls[0].accessToken == "tok"   // Bearer prefix stripped, resolved token threaded through
+        assert calls[0].accessToken == "tok"
+    }
+
+    @Test
+    void testDescribeServiceRejectsNonTrevorismHost() {
+        def s = server(stubRegistry([]), stubHarvester([title: "X"]), recordingPassThrough([]))
+        Map response = s.handle([
+                jsonrpc: "2.0", id: 7, method: "tools/call",
+                params : [name: "describe_service", arguments: [baseUrl: "https://evil.com"]]], "tok")
+        assert response.result.isError == true
+        assert response.result.content[0].text.contains("Refused")
     }
 
     @Test

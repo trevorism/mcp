@@ -65,6 +65,7 @@ dependencies {
 
     testImplementation 'com.trevorism:test-result-events:0.3.0'
     acceptanceImplementation 'io.cucumber:cucumber-groovy:6.10.4'
+    acceptanceImplementation 'com.google.code.gson:gson:2.14.0'
 }
 
 application {
@@ -90,7 +91,7 @@ appengine {
     stage.artifact = layout.buildDirectory.file("libs/${project.name}-all.jar")
     deploy {
         projectId = "trevorism-project"
-        version = "0-3-0"
+        version = "0-4-0"
     }
 }
 
