@@ -9,7 +9,9 @@ import io.cucumber.groovy.Hooks
 this.metaClass.mixin(Hooks)
 this.metaClass.mixin(EN)
 
-def MCP_URL = "https://mcp.project.trevorism.com/mcp"
+String baseUrl = System.getenv("ACCEPTANCE_BASE_URL") ?: "https://mcp.project.trevorism.com"
+
+String MCP_URL = "${baseUrl}/mcp"
 
 def response
 def rejected = false
