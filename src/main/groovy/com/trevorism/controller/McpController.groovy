@@ -5,6 +5,7 @@ import com.trevorism.mcp.TrevorismMcpServer
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Body
 import io.micronaut.http.annotation.Controller
@@ -13,13 +14,11 @@ import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
-import org.reactivestreams.Publisher
-import reactor.core.publisher.Flux
 
 /**
  * MCP over Streamable HTTP, hand-rolled on native Micronaut/Netty.
- * POST carries JSON-RPC messages; GET opens the server->client SSE stream
- * (unused by a tools-only server, but kept open for spec-compliant clients).
+ * POST carries JSON-RPC messages; GET would open the server->client SSE stream, which a
+ * tools-only server does not offer, so it answers 405 as the transport spec prescribes.
  *
  * Auth: the caller presents a Trevorism user REFRESH token as the bearer; TokenManager redeems it
  * for a fresh (cached) access token, which is threaded into the tool handlers for per-user downstream
@@ -52,10 +51,9 @@ class McpController {
     }
 
     @Tag(name = "MCP")
-    @Operation(summary = "MCP server->client SSE stream")
+    @Operation(summary = "No server->client SSE stream is offered; this is a tools-only server (spec: 405)")
     @Get(produces = MediaType.TEXT_EVENT_STREAM)
-    Publisher<String> stream() {
-        // Tools-only server: no server-initiated messages. Keep the stream open.
-        return Flux.never()
+    HttpResponse<?> stream() {
+        return HttpResponse.status(HttpStatus.METHOD_NOT_ALLOWED)
     }
 }
