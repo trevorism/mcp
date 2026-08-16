@@ -33,7 +33,20 @@ When(/an authenticated tools list request is sent to the mcp endpoint/) { ->
 
 Then(/the meta tools and curated tools are present/) { ->
     ["list_trevorism_services", "describe_service", "whoami", "call_trevorism_api",
-     "get_object", "run_test_suite"].each { assert response.contains("\"${it}\"") }
+     "read_gcloud_logs", "get_object", "run_test_suite"].each { assert response.contains("\"${it}\"") }
+}
+
+// Reads this service's own logs, which live in the same project as its App Engine service account —
+// so this passes on nothing more than the default deployment, and is what proves ADC works in production.
+When(/an authenticated request reads the gcloud logs for the mcp service/) { ->
+    SecureHttpClient client = new AppClientSecureHttpClient()
+    response = client.post(MCP_URL, '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":' +
+            '{"name":"read_gcloud_logs","arguments":{"service":"mcp","since":"24h","limit":5}}}')
+}
+
+Then(/log entries are returned without error/) { ->
+    assert response.contains('"isError":false')
+    assert response.contains("trevorism-project")
 }
 
 When(/an unauthenticated request is sent to the mcp endpoint/) { ->

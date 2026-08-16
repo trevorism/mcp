@@ -1,7 +1,11 @@
 package com.trevorism.mcp
 
+import com.trevorism.AppVersion
 import com.trevorism.auth.ClaimsInspector
 import com.trevorism.client.PassThroughClient
+import com.trevorism.logs.CloudLoggingClient
+import com.trevorism.logs.LogQuery
+import com.trevorism.logs.ServiceLocator
 import com.trevorism.mcp.curated.CuratedToolRegistry
 import com.trevorism.model.ServiceEntry
 import com.trevorism.service.ServiceRegistry
@@ -24,8 +28,6 @@ class TrevorismMcpServer {
 
     private static final Logger log = LoggerFactory.getLogger(TrevorismMcpServer)
     private static final String PROTOCOL_VERSION = "2025-06-18"
-    // Versions we can speak. On initialize we echo the client's requested version if we support it,
-    // otherwise we advertise our latest (PROTOCOL_VERSION) and let the client decide.
     private static final Set<String> SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"].toSet()
 
     private final ServiceRegistry registry
@@ -33,22 +35,22 @@ class TrevorismMcpServer {
     private final PassThroughClient passThroughClient
     private final CuratedToolRegistry curatedTools
     private final ClaimsInspector claimsInspector
+    private final CloudLoggingClient loggingClient
+    private final ServiceLocator serviceLocator
 
     TrevorismMcpServer(ServiceRegistry registry, SpecHarvester specHarvester,
                        PassThroughClient passThroughClient, CuratedToolRegistry curatedTools,
-                       ClaimsInspector claimsInspector) {
+                       ClaimsInspector claimsInspector, CloudLoggingClient loggingClient,
+                       ServiceLocator serviceLocator) {
         this.registry = registry
         this.specHarvester = specHarvester
         this.passThroughClient = passThroughClient
         this.curatedTools = curatedTools
         this.claimsInspector = claimsInspector
+        this.loggingClient = loggingClient
+        this.serviceLocator = serviceLocator
     }
 
-    /**
-     * Handle a single JSON-RPC request. {@code accessToken} is the caller's resolved access token
-     * (already stripped of any "Bearer " prefix by the controller's TokenManager). Returns the response
-     * Map, or {@code null} for notifications.
-     */
     Map handle(Map request, String accessToken) {
         String method = request?.method
         if (!method) {
@@ -84,7 +86,7 @@ class TrevorismMcpServer {
         [
                 protocolVersion: negotiated,
                 capabilities   : [tools: [listChanged: false]],
-                serverInfo     : [name: "trevorism-mcp", version: "0.4.0"]
+                serverInfo     : [name: "trevorism-mcp", version: AppVersion.SEMVER]
         ]
     }
 
@@ -140,6 +142,34 @@ class TrevorismMcpServer {
                                       required  : ["baseUrl", "method", "path"]],
                         // Generic escape hatch: it can issue any method, so treat it as potentially destructive.
                         annotations: [title: "Call Trevorism API", readOnlyHint: false, destructiveHint: true, openWorldHint: true]
+                ],
+                [
+                        name       : "read_gcloud_logs",
+                        description: "Read Google Cloud Logging entries for a deployed Trevorism service. " +
+                                "Give 'service' (a Trevorism service name, whose GCP project and App Engine " +
+                                "module are resolved for you), or 'project' plus optionally 'module'. " +
+                                "Newest entries first. Uses this server's own Google identity, not the caller's token.",
+                        inputSchema: [type      : "object",
+                                      properties: [
+                                              service : [type       : "string",
+                                                         description: "Trevorism service name, e.g. 'event' or 'mcp'"],
+                                              project : [type       : "string",
+                                                         description: "GCP project id, e.g. 'trevorism-data'. " +
+                                                                 "Overrides the one derived from 'service'."],
+                                              module  : [type       : "string",
+                                                         description: "App Engine service (module) id; 'default' for a " +
+                                                                 "category's default service. Omit for all modules."],
+                                              severity: [type       : "string", 'enum': LogQuery.SEVERITIES,
+                                                         description: "Minimum severity, e.g. ERROR"],
+                                              since   : [type       : "string",
+                                                         description: "How far back to look: 30m, 2h, 3d (default 1h, max 30d)"],
+                                              contains: [type       : "string", description: "Only entries containing this text"],
+                                              filter  : [type       : "string",
+                                                         description: "Extra raw Cloud Logging filter, AND-ed with the rest"],
+                                              limit   : [type       : "integer", description: "Max entries (default 50, max 500)"]
+                                      ],
+                                      required  : []],
+                        annotations: readOnly("Read Google Cloud logs")
                 ]
         ]
     }
@@ -167,6 +197,8 @@ class TrevorismMcpServer {
             case "call_trevorism_api":
                 String url = "${args.baseUrl}${args.path}"
                 return passThroughClient.callApi((args.method ?: "GET") as String, url, args.body as String, bearer)
+            case "read_gcloud_logs":
+                return readLogs(args, bearer)
             default:
                 return PassThroughClient.toolError("Unknown tool: ${name}")
         }
@@ -188,6 +220,44 @@ class TrevorismMcpServer {
             return PassThroughClient.toolError("Refused: '${baseUrl}' is not a Trevorism (*.trevorism.com) host")
         }
         return PassThroughClient.toolText(JsonOutput.toJson(specHarvester.describe(baseUrl)))
+    }
+
+    private Map readLogs(Map args, String bearer) {
+        String project = args.project as String
+        String module = args.module as String
+
+        if (args.service && (!project || !module)) {
+            Map located = serviceLocator.locate(args.service as String, bearer)
+            if (!located && !project) {
+                return PassThroughClient.toolError("Could not resolve service '${args.service}' to a GCP project. " +
+                        "Use list_trevorism_services to check the name, or pass 'project' explicitly.")
+            }
+            project = project ?: located?.project
+            module = module ?: located?.module
+        }
+        if (!project) {
+            return PassThroughClient.toolError("read_gcloud_logs requires 'service' or 'project'")
+        }
+
+        LogQuery query = new LogQuery(project: project, module: module, severity: args.severity as String,
+                contains: args.contains as String, rawFilter: args.filter as String)
+        if (args.since) {
+            query.since = args.since as String
+        }
+        if (args.limit != null) {
+            query.limit = args.limit as int
+        }
+
+        try {
+            return PassThroughClient.toolText(JsonOutput.toJson(loggingClient.read(query)))
+        } catch (IllegalArgumentException e) {
+            return PassThroughClient.toolError(e.message)
+        } catch (IllegalStateException e) {
+            return PassThroughClient.toolError(e.message)
+        } catch (Exception e) {
+            log.error("Log read failed for project ${project}", e)
+            return PassThroughClient.toolError("Could not read logs: ${e.message}")
+        }
     }
 
     private static Map result(id, Object payload) {

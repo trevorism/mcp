@@ -3,9 +3,6 @@ package com.trevorism.model
 import groovy.transform.CompileStatic
 import groovy.transform.ToString
 
-/**
- * A discovered Trevorism service: its repo/service name, resolved base URL, and category (dns).
- */
 @CompileStatic
 @ToString(includeNames = true)
 class ServiceEntry {

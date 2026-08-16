@@ -4,11 +4,6 @@ import com.trevorism.client.PassThroughClient
 import groovy.json.JsonOutput
 import jakarta.inject.Singleton
 
-/**
- * Registry of curated first-class MCP tools. Each tool maps a named, typed schema to a single downstream
- * HTTP call routed through {@link PassThroughClient} (per-user token). Data-driven: extend by adding a
- * {@link CuratedTool} to {@link #TOOLS}.
- */
 @Singleton
 class CuratedToolRegistry {
 
