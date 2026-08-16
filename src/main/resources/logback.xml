@@ -8,6 +8,7 @@
     </appender>
 
     <logger name="com.trevorism" level="debug" />
+    <logger name="com.trevorism.micronaut.TrevorismAuthenticationFetcher" level="warn" />
 
     <root level="info">
         <appender-ref ref="STDOUT" />
