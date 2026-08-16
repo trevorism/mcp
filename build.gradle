@@ -62,6 +62,7 @@ dependencies {
     runtimeOnly("ch.qos.logback:logback-classic")
 
     implementation('com.trevorism:micronaut-utility-beans:2.0.0')
+    implementation('com.google.auth:google-auth-library-oauth2-http:1.47.0')
 
     testImplementation 'com.trevorism:test-result-events:0.3.0'
     acceptanceImplementation 'io.cucumber:cucumber-groovy:6.10.4'
@@ -91,7 +92,7 @@ appengine {
     stage.artifact = layout.buildDirectory.file("libs/${project.name}-all.jar")
     deploy {
         projectId = "trevorism-project"
-        version = "0-4-0"
+        version = "0-5-0"
     }
 }
 
