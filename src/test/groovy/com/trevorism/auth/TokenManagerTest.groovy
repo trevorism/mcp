@@ -5,7 +5,6 @@ import org.junit.jupiter.api.Test
 
 class TokenManagerTest {
 
-    /** TokenManager whose redeem boundary is faked, counting invocations. */
     private static TokenManager withRedeem(List<String> seen, Closure<String> impl) {
         new TokenManager() {
             @Override

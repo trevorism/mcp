@@ -24,7 +24,6 @@ class SpecHarvester {
     private static final long TTL_MILLIS = 3600_000L
     private static final List<String> HTTP_METHODS = ["get", "post", "put", "delete", "patch"]
 
-    // Captures the quoted spec path from swagger-ui/index.html, e.g. '/swagger/data-0.9.0.yml'
     private static final Pattern SPEC_REF = Pattern.compile(/'([^']*\/swagger\/[^']+\.(?:ya?ml|json))'/)
 
     private final JsonHttpClient http = new JsonHttpClient()

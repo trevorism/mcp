@@ -1,5 +1,6 @@
 package com.trevorism.mcp
 
+import com.trevorism.AppVersion
 import com.trevorism.auth.ClaimsInspector
 import com.trevorism.client.PassThroughClient
 import com.trevorism.logs.CloudLoggingClient
@@ -27,8 +28,6 @@ class TrevorismMcpServer {
 
     private static final Logger log = LoggerFactory.getLogger(TrevorismMcpServer)
     private static final String PROTOCOL_VERSION = "2025-06-18"
-    // Versions we can speak. On initialize we echo the client's requested version if we support it,
-    // otherwise we advertise our latest (PROTOCOL_VERSION) and let the client decide.
     private static final Set<String> SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"].toSet()
 
     private final ServiceRegistry registry
@@ -52,11 +51,6 @@ class TrevorismMcpServer {
         this.serviceLocator = serviceLocator
     }
 
-    /**
-     * Handle a single JSON-RPC request. {@code accessToken} is the caller's resolved access token
-     * (already stripped of any "Bearer " prefix by the controller's TokenManager). Returns the response
-     * Map, or {@code null} for notifications.
-     */
     Map handle(Map request, String accessToken) {
         String method = request?.method
         if (!method) {
@@ -92,7 +86,7 @@ class TrevorismMcpServer {
         [
                 protocolVersion: negotiated,
                 capabilities   : [tools: [listChanged: false]],
-                serverInfo     : [name: "trevorism-mcp", version: "0.5.0"]
+                serverInfo     : [name: "trevorism-mcp", version: AppVersion.SEMVER]
         ]
     }
 

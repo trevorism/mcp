@@ -19,10 +19,6 @@ class TokenManager {
     private final JsonHttpClient http = new JsonHttpClient()
     private final Map<String, CachedToken> cache = new ConcurrentHashMap<>()
 
-    /**
-     * Resolve the inbound bearer credential to a usable access token, or {@code null} if it is neither a
-     * redeemable refresh token nor a plausible access token.
-     */
     String resolveAccessToken(String authorizationHeader) {
         String bearer = strip(authorizationHeader)
         if (!bearer) {
@@ -43,7 +39,6 @@ class TokenManager {
                 return accessToken
             }
         } catch (InvalidRequestException e) {
-            // Not a redeemable refresh token — fall back to using the bearer directly as an access token.
             log.debug("Redeem failed (${e.statusCode}); treating bearer as an access token")
         } catch (Exception e) {
             log.warn("Unexpected error redeeming refresh token: ${e.message}")
@@ -51,7 +46,6 @@ class TokenManager {
         return bearer
     }
 
-    /** Perform the actual redeem call. Overridable for tests. */
     protected String redeem(String refreshToken) {
         String body = JsonOutput.toJson([refreshToken: refreshToken])
         return http.post(REDEEM_URL, body)?.trim()

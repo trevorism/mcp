@@ -5,16 +5,6 @@ import jakarta.inject.Singleton
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-/**
- * Mints Google access tokens from Application Default Credentials.
- *
- * No credential is stored in this repo. Deployed on App Engine, ADC resolves to the runtime's own
- * service account via the GCP metadata server; locally it resolves to whatever
- * `gcloud auth application-default login` left in the user's profile. A clone of this repo therefore
- * carries no access to anyone else's logs.
- *
- * Credentials are built lazily on first use so that cold starts of the other tools pay nothing for this.
- */
 @Singleton
 class GoogleTokenProvider {
 
@@ -45,8 +35,6 @@ class GoogleTokenProvider {
         synchronized (this) {
             if (credentials == null) {
                 GoogleCredentials loaded = loadDefault()
-                // The metadata-server identity carries its scopes already and rejects createScoped;
-                // user ADC and service-account keys need them applied explicitly.
                 credentials = loaded.createScopedRequired() ? loaded.createScoped(SCOPES) : loaded
                 log.info("Resolved Google application default credentials (${credentials.getClass().simpleName})")
             }

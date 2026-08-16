@@ -84,7 +84,6 @@ class TrevorismMcpServerTest {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
         Map response = s.handle([jsonrpc: "2.0", id: 1, method: "initialize",
                                  params : [protocolVersion: "2025-03-26"]], "Bearer t")
-        // We speak 2025-03-26, so we honor the client's request rather than forcing our latest.
         assert response.result.protocolVersion == "2025-03-26"
     }
 
@@ -100,10 +99,8 @@ class TrevorismMcpServerTest {
     void testToolsListHasMetaAndCuratedTools() {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
         def names = s.handle([jsonrpc: "2.0", id: 2, method: "tools/list"], "Bearer t").result.tools.collect { it.name }
-        // 6 meta tools (incl. whoami and read_gcloud_logs)
         assert names.containsAll(["list_trevorism_services", "describe_service", "whoami", "ping_service",
                                   "call_trevorism_api", "read_gcloud_logs"])
-        // curated tools appended
         assert names.containsAll(["get_object", "create_object", "run_test_suite", "register_test_suite"])
         assert names.size() == 17
     }
@@ -117,7 +114,7 @@ class TrevorismMcpServerTest {
         def claims = new groovy.json.JsonSlurper().parseText(response.result.content[0].text)
         assert claims.permissions == "CRE"
         assert claims.role == "user"
-        assert claims.accessToken == "abc"   // resolved access token threaded to inspector
+        assert claims.accessToken == "abc"
     }
 
     @Test

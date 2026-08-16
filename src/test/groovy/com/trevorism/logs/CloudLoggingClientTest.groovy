@@ -18,7 +18,6 @@ class CloudLoggingClientTest {
         }
     }
 
-    /** Replays the given JSON responses in order, recording each request body and header map. */
     private static CloudLoggingClient client(List<String> responses, List requests,
                                              GoogleTokenProvider provider = fixedToken("g-token")) {
         new CloudLoggingClient(provider) {

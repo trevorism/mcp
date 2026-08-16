@@ -7,14 +7,6 @@ import java.time.Instant
 import java.time.format.DateTimeFormatter
 import java.util.regex.Matcher
 
-/**
- * Turns MCP tool arguments into a Cloud Logging entries:list request. Pure — no I/O — so the filter
- * language, which is easy to get subtly wrong, is fully unit testable.
- *
- * Note that no logName is pinned: App Engine writes application output to `stdout`/`stderr` and request
- * summaries to `appengine.googleapis.com/request_log`, and a query that named one would silently miss
- * the other.
- */
 @CompileStatic
 class LogQuery {
 
@@ -36,7 +28,6 @@ class LogQuery {
 
     private Instant now = Instant.now()
 
-    /** Test seam so a query's timestamp bound is deterministic. */
     LogQuery at(Instant instant) {
         this.now = instant
         return this
@@ -46,7 +37,6 @@ class LogQuery {
         return id != null && id.matches(/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/)
     }
 
-    /** The entries:list request body. Throws IllegalArgumentException on unusable arguments. */
     Map toRequest() {
         if (!isValidProject(project)) {
             throw new IllegalArgumentException("Invalid GCP project id: '${project}'")
@@ -117,7 +107,6 @@ class LogQuery {
         }
     }
 
-    /** The filter is a query language, so caller-supplied values are quoted, never concatenated raw. */
     private static String escape(String value) {
         return value.replace("\\", "\\\\").replace('"', '\\"')
     }

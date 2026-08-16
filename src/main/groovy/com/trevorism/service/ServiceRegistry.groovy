@@ -39,12 +39,9 @@ class ServiceRegistry {
     private static final String ACTIVE_URL = "https://active.project.trevorism.com/api/active/service"
     private static final String PROJECT_SERVICE_URL = "https://project.trevorism.com/project/service/"
     private static final long TTL_MILLIS = 3600_000L
-    // The project service resolves each category by fetching the repo's deploy.yml from GitHub, so it
-    // is the bottleneck; keep concurrency modest to avoid transient failures under a burst.
     private static final int MAX_THREADS = 10
     private static final int CATEGORY_ATTEMPTS = 3
 
-    /** App Engine default-service repos (no `service:` in app.yaml) -> host is `<category>.trevorism.com`. */
     private static final Set<String> DEFAULT_SERVICES = [
             "action", "auth-provider", "cleo-frontend", "data", "homepage", "memo", "project", "testing", "trade"
     ].toSet()
@@ -123,7 +120,6 @@ class ServiceRegistry {
     }
 
     protected String fetchCategory(String name, String bearer) {
-        // The project service is GitHub-backed and flaky under load; retry transient failures, but not auth.
         for (int attempt = 1; attempt <= CATEGORY_ATTEMPTS; attempt++) {
             try {
                 String body = http.get(PROJECT_SERVICE_URL + name, [Authorization: "Bearer ${bearer}".toString()]).value
@@ -151,7 +147,6 @@ class ServiceRegistry {
         }
     }
 
-    /** Canonical host from the platform convention (default service vs. subdomain). */
     static String buildHost(String name, String category) {
         return DEFAULT_SERVICES.contains(name) ?
                 "https://${category}.trevorism.com" :
@@ -159,7 +154,6 @@ class ServiceRegistry {
     }
 
     protected boolean pingOk(String baseUrl) {
-        // Two ping conventions exist across the platform: some services answer at /ping, others at /api/ping.
         return pingPath("${baseUrl}/ping") || pingPath("${baseUrl}/api/ping")
     }
 
