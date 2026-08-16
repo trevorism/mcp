@@ -5,15 +5,13 @@ import org.junit.jupiter.api.Test
 
 class ServiceRegistryTest {
 
-    /** Registry whose HTTP boundary is faked: names + categories are fixed, ping succeeds only for given hosts. */
-    private static ServiceRegistry fakeRegistry(List<String> names, Map<String, String> categories, Set<String> pingable) {
+    /** Registry whose HTTP boundary is faked: names + categories are fixed. */
+    private static ServiceRegistry fakeRegistry(List<String> names, Map<String, String> categories) {
         new ServiceRegistry() {
             @Override
             protected List<String> fetchActiveNames() { names }
             @Override
             protected String fetchCategory(String name, String bearer) { categories[name] }
-            @Override
-            protected boolean pingOk(String baseUrl) { pingable.contains(baseUrl) }
         }
     }
 
@@ -34,29 +32,63 @@ class ServiceRegistryTest {
     @Test
     void testRefreshResolvesCanonicalHostsAndDropsUnresolved() {
         def reg = fakeRegistry(
-                ["data", "event", "auth-provider", "ghost", "dead"],
-                [data: "data", event: "data", "auth-provider": "auth", ghost: null, dead: "data"],
-                // note: 'dead' has a category but its canonical host does not ping -> pruned
-                ["https://data.trevorism.com",
-                 "https://event.data.trevorism.com",
-                 "https://auth.trevorism.com"] as Set)
+                ["data", "event", "auth-provider", "ghost"],
+                [data: "data", event: "data", "auth-provider": "auth", ghost: null])
 
         List<ServiceEntry> entries = reg.refresh("tok")
 
-        assert entries.collect { it.name } == ["auth-provider", "data", "event"]  // sorted; ghost + dead dropped
+        assert entries.collect { it.name } == ["auth-provider", "data", "event"]  // sorted; ghost dropped
         assert entries.find { it.name == "event" }.baseUrl == "https://event.data.trevorism.com"
         assert entries.find { it.name == "auth-provider" }.baseUrl == "https://auth.trevorism.com"
     }
 
     @Test
     void testRefreshThrowsWhenAllUnresolved() {
-        def reg = fakeRegistry(["data"], [data: null], [] as Set)
+        def reg = fakeRegistry(["data"], [data: null])
         try {
             reg.refresh("expired")
             assert false: "expected failure"
         } catch (IllegalStateException e) {
             assert e.message.contains("expired or invalid token")
         }
+    }
+
+    @Test
+    void testByNameResolvesOneServiceWithoutDiscoveringThePlatform() {
+        int[] activeFetches = [0]
+        def reg = new ServiceRegistry() {
+            @Override
+            protected List<String> fetchActiveNames() { activeFetches[0]++; ["mcp", "event", "data"] }
+            @Override
+            protected String fetchCategory(String name, String bearer) { name == "mcp" ? "project" : "data" }
+        }
+
+        ServiceEntry entry = reg.byName("mcp", "tok")
+
+        assert entry.baseUrl == "https://mcp.project.trevorism.com"
+        assert entry.category == "project"
+        assert activeFetches[0] == 0
+    }
+
+    @Test
+    void testByNameReturnsNullWhenTheServiceDoesNotResolve() {
+        def reg = fakeRegistry(["data"], [nope: null])
+        assert reg.byName("nope", "tok") == null
+    }
+
+    @Test
+    void testByNameIsServedFromAFreshCache() {
+        int[] categoryFetches = [0]
+        def reg = new ServiceRegistry() {
+            @Override
+            protected List<String> fetchActiveNames() { ["data"] }
+            @Override
+            protected String fetchCategory(String name, String bearer) { categoryFetches[0]++; "data" }
+        }
+        reg.listServices("tok")
+
+        assert reg.byName("data", "tok").baseUrl == "https://data.trevorism.com"
+        assert categoryFetches[0] == 1
     }
 
     @Test
@@ -67,8 +99,6 @@ class ServiceRegistryTest {
             protected List<String> fetchActiveNames() { fetches[0]++; ["data"] }
             @Override
             protected String fetchCategory(String name, String bearer) { "data" }
-            @Override
-            protected boolean pingOk(String baseUrl) { baseUrl == "https://data.trevorism.com" }
         }
         reg.listServices("tok")
         reg.listServices("tok")

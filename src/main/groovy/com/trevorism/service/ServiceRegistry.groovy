@@ -21,11 +21,12 @@ import java.util.concurrent.Future
  * built from the platform convention: App Engine DEFAULT services live at `<category>.trevorism.com`,
  * everything else at `<name>.<category>.trevorism.com`.
  *
- * Ping cannot be used to *discover* the host: App Engine wildcard routing makes
- * `<anything>.<category>.trevorism.com` answer `pong` (it falls through to the category's default
- * service), so a bogus subdomain looks alive. The authoritative default-vs-subdomain signal is the
- * repo's `app.yaml` `service:` field; the set of default-service repos is small and stable, captured
- * in {@link #DEFAULT_SERVICES}. A single ping of the *constructed* host validates/prunes the entry.
+ * Discovery never pings. App Engine wildcard routing makes `<anything>.<category>.trevorism.com`
+ * answer `pong` (it falls through to the category's default service), so a ping cannot discover a
+ * host, nor tell a real subdomain from a bogus one — it only wakes a scale-to-zero instance and
+ * bills a cold start. The authoritative default-vs-subdomain signal is the repo's `app.yaml`
+ * `service:` field; that set is small and stable, captured in {@link #DEFAULT_SERVICES}. Liveness is
+ * the caller's business, via the `ping_service` tool.
  *
  * Category lookups use a plain client with an explicit Authorization header (NOT the request-scoped
  * pass-through client, which would not resolve the token off the request thread) and run on a sized
@@ -61,7 +62,14 @@ class ServiceRegistry {
     }
 
     ServiceEntry byName(String name, String bearer) {
-        return listServices(bearer).find { it.name == name }
+        ServiceEntry cached = findCached(name)
+        return cached ?: resolveOne(name, bearer)
+    }
+
+    private ServiceEntry findCached(String name) {
+        List<ServiceEntry> current = cache
+        boolean fresh = current != null && (System.currentTimeMillis() - cachedAt) < TTL_MILLIS
+        return fresh ? current.find { it.name == name } : null
     }
 
     synchronized List<ServiceEntry> refresh(String bearer) {
@@ -111,8 +119,7 @@ class ServiceRegistry {
             if (!category || category == "null") {
                 return null
             }
-            String baseUrl = buildHost(name, category)
-            return pingOk(baseUrl) ? new ServiceEntry(name, baseUrl, category) : null
+            return new ServiceEntry(name, buildHost(name, category), category)
         } catch (Exception e) {
             log.debug("Could not resolve ${name}: ${e.message}")
             return null
@@ -151,17 +158,5 @@ class ServiceRegistry {
         return DEFAULT_SERVICES.contains(name) ?
                 "https://${category}.trevorism.com" :
                 "https://${name}.${category}.trevorism.com"
-    }
-
-    protected boolean pingOk(String baseUrl) {
-        return pingPath("${baseUrl}/ping") || pingPath("${baseUrl}/api/ping")
-    }
-
-    private boolean pingPath(String url) {
-        try {
-            return http.get(url)?.trim() == "pong"
-        } catch (Exception ignored) {
-            return false
-        }
     }
 }
