@@ -261,4 +261,45 @@ class TrevorismMcpServerTest {
         def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough([]))
         assert s.handle([jsonrpc: "2.0", id: 9, method: "does/notExist"], "Bearer t").error.code == -32601
     }
+
+    @Test
+    void testCallApiSerializesObjectBodyAsJson() {
+        List calls = []
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough(calls))
+        s.handle([
+                jsonrpc: "2.0", id: 51, method: "tools/call",
+                params : [name     : "call_trevorism_api",
+                          arguments: [baseUrl: "https://changelog.project.trevorism.com",
+                                      method : "POST",
+                                      path   : "/api/entry",
+                                      body   : [date: "2026-07-18", repository: "trevorism/prompt"]]]], "tok")
+        assert calls[0].body == '{"date":"2026-07-18","repository":"trevorism/prompt"}'
+    }
+
+    @Test
+    void testCallApiPassesStringBodyThrough() {
+        List calls = []
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough(calls))
+        s.handle([
+                jsonrpc: "2.0", id: 52, method: "tools/call",
+                params : [name     : "call_trevorism_api",
+                          arguments: [baseUrl: "https://changelog.project.trevorism.com",
+                                      method : "POST",
+                                      path   : "/api/entry",
+                                      body   : '{"date":"2026-07-18"}']]], "tok")
+        assert calls[0].body == '{"date":"2026-07-18"}'
+    }
+
+    @Test
+    void testCallApiLeavesMissingBodyNull() {
+        List calls = []
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough(calls))
+        s.handle([
+                jsonrpc: "2.0", id: 53, method: "tools/call",
+                params : [name     : "call_trevorism_api",
+                          arguments: [baseUrl: "https://changelog.project.trevorism.com",
+                                      method : "GET",
+                                      path   : "/api/entry"]]], "tok")
+        assert calls[0].body == null
+    }
 }

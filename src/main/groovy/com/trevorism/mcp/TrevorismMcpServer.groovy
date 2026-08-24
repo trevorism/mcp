@@ -196,12 +196,22 @@ class TrevorismMcpServer {
                 return passThroughClient.callApi("GET", "${args.baseUrl}/ping", null, bearer)
             case "call_trevorism_api":
                 String url = "${args.baseUrl}${args.path}"
-                return passThroughClient.callApi((args.method ?: "GET") as String, url, args.body as String, bearer)
+                return passThroughClient.callApi((args.method ?: "GET") as String, url, toJsonBody(args.body), bearer)
             case "read_gcloud_logs":
                 return readLogs(args, bearer)
             default:
                 return PassThroughClient.toolError("Unknown tool: ${name}")
         }
+    }
+
+    protected static String toJsonBody(Object body) {
+        if (body == null) {
+            return null
+        }
+        if (body instanceof CharSequence) {
+            return body.toString()
+        }
+        return JsonOutput.toJson(body)
     }
 
     private Map describeService(Map args, String bearer) {
