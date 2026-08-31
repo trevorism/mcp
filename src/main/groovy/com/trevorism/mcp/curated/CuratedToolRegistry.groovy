@@ -115,7 +115,7 @@ class CuratedToolRegistry {
                 new CuratedTool(
                         name: "list_objects", baseUrl: DATA, method: "GET", pathTemplate: "/object/{kind}",
                         description: "Get all objects of a given type/kind.",
-                        pathParams: ["kind"], queryParams: ["datasource"], annotations: readOnly("Get objects"),
+                        pathParams: ["kind"], queryParams: ["datasource"], annotations: readOnly("List objects"),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), datasource: datasource], required: ["kind"]]),
                 new CuratedTool(
                         name: "get_object", baseUrl: DATA, method: "GET", pathTemplate: "/object/{kind}/{id}",
