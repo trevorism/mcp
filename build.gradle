@@ -61,8 +61,8 @@ dependencies {
 
     runtimeOnly("ch.qos.logback:logback-classic")
 
-    implementation('com.trevorism:micronaut-utility-beans:2.1.0')
-    implementation('com.google.auth:google-auth-library-oauth2-http:1.50.0')
+    implementation('com.trevorism:micronaut-utility-beans:2.1.1')
+    implementation('com.google.auth:google-auth-library-oauth2-http:1.51.0')
 
     testImplementation 'com.trevorism:test-result-events:0.3.0'
     acceptanceImplementation 'io.cucumber:cucumber-groovy:6.10.4'

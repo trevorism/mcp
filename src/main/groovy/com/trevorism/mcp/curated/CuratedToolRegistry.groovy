@@ -9,6 +9,7 @@ class CuratedToolRegistry {
 
     private static final String DATA = "https://data.trevorism.com"
     private static final String TESTING = "https://testing.trevorism.com"
+    private static final String LIST = "https://list.data.trevorism.com"
 
     private static final List<String> DATASOURCES = ["datastore", "bigquery", "memory"]
     private static final List<String> SUITE_KINDS = ["unit", "javascript", "cucumber", "web", "powershell", "cypress"]
@@ -112,7 +113,7 @@ class CuratedToolRegistry {
                         queryParams: ["datasource"], annotations: readOnly("List object types"),
                         inputSchema: [type: "object", properties: [datasource: datasource], required: []]),
                 new CuratedTool(
-                        name: "get_objects", baseUrl: DATA, method: "GET", pathTemplate: "/object/{kind}",
+                        name: "list_objects", baseUrl: DATA, method: "GET", pathTemplate: "/object/{kind}",
                         description: "Get all objects of a given type/kind.",
                         pathParams: ["kind"], queryParams: ["datasource"], annotations: readOnly("Get objects"),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), datasource: datasource], required: ["kind"]]),
@@ -128,22 +129,20 @@ class CuratedToolRegistry {
                         annotations: writes("Create object", false, false),
                         inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), data: objectSchema("The object to create"), datasource: datasource], required: ["kind", "data"]]),
                 new CuratedTool(
-                        name: "update_object", baseUrl: DATA, method: "PUT", pathTemplate: "/object/{kind}/{id}",
-                        description: "Update the object of type {kind} with id {id}.",
-                        pathParams: ["kind", "id"], queryParams: ["datasource"], bodyObjectArg: "data",
-                        annotations: writes("Update object", true, true),
-                        inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), id: stringProp("Object id"), data: objectSchema("The updated object"), datasource: datasource], required: ["kind", "id", "data"]]),
+                        name: "list_lists", baseUrl: LIST, method: "GET", pathTemplate: "/object",
+                        description: "Get all deployed Trevorism lists.",
+                        annotations: readOnly("List lists"),
+                        inputSchema: [type: "object", properties: [:], required: []]),
                 new CuratedTool(
-                        name: "delete_object", baseUrl: DATA, method: "DELETE", pathTemplate: "/object/{kind}/{id}",
-                        description: "Delete the object of type {kind} with id {id}.",
-                        pathParams: ["kind", "id"], queryParams: ["datasource"],
-                        annotations: writes("Delete object", true, true),
-                        inputSchema: [type: "object", properties: [kind: stringProp("Object type/kind"), id: stringProp("Object id"), datasource: datasource], required: ["kind", "id"]]),
+                        name: "get_list", baseUrl: LIST, method: "GET", pathTemplate: "/object/{id}",
+                        description: "Get a Trevorism list by id.",
+                        pathParams: ["id"], annotations: readOnly("Get list"),
+                        inputSchema: [type: "object", properties: [id: stringProp("List id")], required: ["id"]]),
                 new CuratedTool(
-                        name: "query_data", baseUrl: DATA, method: "POST", pathTemplate: "/query",
-                        description: "Run a data query and get results. Pass the query specification object.",
-                        queryParams: ["datasource"], bodyObjectArg: "query", annotations: readOnly("Query data"),
-                        inputSchema: [type: "object", properties: [query: objectSchema("The query specification"), datasource: datasource], required: ["query"]]),
+                        name: "get_list_content", baseUrl: LIST, method: "GET", pathTemplate: "/object/{id}/content",
+                        description: "Get the contents of a Trevorism list by id.",
+                        pathParams: ["id"], annotations: readOnly("Get list content"),
+                        inputSchema: [type: "object", properties: [id: stringProp("List id")], required: ["id"]]),
 
                 // ---- Testing (testing.trevorism.com) ----
                 new CuratedTool(
