@@ -101,7 +101,8 @@ class TrevorismMcpServerTest {
         def names = s.handle([jsonrpc: "2.0", id: 2, method: "tools/list"], "Bearer t").result.tools.collect { it.name }
         assert names.containsAll(["list_trevorism_services", "describe_service", "whoami", "ping_service",
                                   "call_trevorism_api", "read_gcloud_logs"])
-        assert names.containsAll(["get_object", "create_object", "run_test_suite", "register_test_suite"])
+        assert names.containsAll(["get_object", "create_object", "list_lists", "get_list", "get_list_content",
+                                  "run_test_suite", "register_test_suite"])
         assert names.size() == 17
     }
 
@@ -126,6 +127,18 @@ class TrevorismMcpServerTest {
                 params : [name: "get_object", arguments: [kind: "app", id: "42"]]], "tok")
         assert calls[0].method == "GET"
         assert calls[0].url == "https://data.trevorism.com/object/app/42"
+        assert calls[0].accessToken == "tok"
+    }
+
+    @Test
+    void testListCuratedToolRoutesThroughPassThrough() {
+        List calls = []
+        def s = server(stubRegistry([]), stubHarvester([:]), recordingPassThrough(calls))
+        s.handle([
+                jsonrpc: "2.0", id: 21, method: "tools/call",
+                params : [name: "get_list_content", arguments: [id: "6553743902375936"]]], "tok")
+        assert calls[0].method == "GET"
+        assert calls[0].url == "https://list.data.trevorism.com/object/6553743902375936/content"
         assert calls[0].accessToken == "tok"
     }
 

@@ -24,8 +24,8 @@ class CuratedToolRegistryTest {
     void testToolDefinitionsIncludeAllCuratedTools() {
         def names = reg(new Recorder()).toolDefinitions().collect { it.name }
         assert names.containsAll([
-                "list_object_types", "get_objects", "get_object", "create_object", "update_object",
-                "delete_object", "query_data",
+                "list_object_types", "list_objects", "get_object", "create_object",
+                "list_lists", "get_list", "get_list_content",
                 "list_test_suites", "get_test_suite", "run_test_suite", "register_test_suite"])
         assert names.size() == 11
     }
@@ -34,9 +34,6 @@ class CuratedToolRegistryTest {
     void testMutatingToolsCarryDestructiveAnnotations() {
         def defs = reg(new Recorder()).toolDefinitions().collectEntries { [(it.name): it] }
         assert defs.get_object.annotations.readOnlyHint == true
-        assert defs.query_data.annotations.readOnlyHint == true
-        assert defs.delete_object.annotations.readOnlyHint == false
-        assert defs.delete_object.annotations.destructiveHint == true
         assert defs.create_object.annotations.destructiveHint == false
     }
 
@@ -57,19 +54,25 @@ class CuratedToolRegistryTest {
     }
 
     @Test
-    void testOptionalQueryParam() {
-        def rec = new Recorder()
-        reg(rec).call("get_objects", [kind: "app", datasource: "bigquery"], "tok")
-        assert rec.calls[0].url == "https://data.trevorism.com/object/app?datasource=bigquery"
-    }
-
-    @Test
     void testBodyFromObjectArg() {
         def rec = new Recorder()
         reg(rec).call("create_object", [kind: "app", data: [name: "x", n: 1]], "tok")
         assert rec.calls[0].method == "POST"
         assert rec.calls[0].url == "https://data.trevorism.com/object/app"
         assert rec.calls[0].body == '{"name":"x","n":1}'
+    }
+
+    @Test
+    void testListToolsRouteToListService() {
+        def rec = new Recorder()
+        def registry = reg(rec)
+        registry.call("list_lists", [:], "tok")
+        registry.call("get_list", [id: "123"], "tok")
+        registry.call("get_list_content", [id: "123"], "tok")
+        assert rec.calls[0].url == "https://list.data.trevorism.com/object"
+        assert rec.calls[1].url == "https://list.data.trevorism.com/object/123"
+        assert rec.calls[2].url == "https://list.data.trevorism.com/object/123/content"
+        assert rec.calls.every { it.method == "GET" }
     }
 
     @Test
