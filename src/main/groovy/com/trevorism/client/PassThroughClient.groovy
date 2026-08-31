@@ -19,7 +19,9 @@ class PassThroughClient {
             log.warn("Refusing to forward token to non-Trevorism host: ${url}")
             return toolError("Refused: '${url}' is not a Trevorism (*.trevorism.com) host")
         }
+
         Map<String, String> headers = ["Authorization": "Bearer ${accessToken}".toString()]
+
         try {
             String response
             switch (method?.toUpperCase()) {

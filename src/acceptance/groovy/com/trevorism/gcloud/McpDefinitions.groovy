@@ -36,8 +36,6 @@ Then(/the meta tools and curated tools are present/) { ->
      "read_gcloud_logs", "get_object", "run_test_suite"].each { assert response.contains("\"${it}\"") }
 }
 
-// Reads this service's own logs, which live in the same project as its App Engine service account —
-// so this passes on nothing more than the default deployment, and is what proves ADC works in production.
 When(/an authenticated request reads the gcloud logs for the mcp service/) { ->
     SecureHttpClient client = new AppClientSecureHttpClient()
     response = client.post(MCP_URL, '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":' +

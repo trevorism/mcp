@@ -16,7 +16,6 @@ class ClaimsInspector {
         this.propertiesProvider = propertiesProvider
     }
 
-    /** For test subclasses that override {@link #inspect}. */
     protected ClaimsInspector() {}
 
     Map inspect(String accessToken) {

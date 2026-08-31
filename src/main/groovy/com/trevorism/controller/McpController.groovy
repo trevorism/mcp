@@ -46,7 +46,6 @@ class McpController {
                     error  : [code: -32001, message: "Missing or invalid Authorization bearer token"]])
         }
         Map response = server.handle(request, accessToken)
-        // Notifications get no body, per JSON-RPC.
         return response == null ? HttpResponse.accepted() : HttpResponse.ok(response)
     }
 

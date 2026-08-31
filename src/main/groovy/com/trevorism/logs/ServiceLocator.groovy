@@ -26,11 +26,11 @@ class ServiceLocator {
         return [project: projectFor(entry.category), module: moduleFor(entry)]
     }
 
-    static String projectFor(String category) {
+    private static String projectFor(String category) {
         return category == "trevorism" ? "trevorism" : "trevorism-${category}".toString()
     }
 
-    static String moduleFor(ServiceEntry entry) {
+    private static String moduleFor(ServiceEntry entry) {
         String host = hostOf(entry.baseUrl)
         if (!host) {
             return entry.name

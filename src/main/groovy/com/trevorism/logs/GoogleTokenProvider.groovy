@@ -27,7 +27,6 @@ class GoogleTokenProvider {
         return creds.getAccessToken()?.getTokenValue()
     }
 
-    /** Loadable ADC, or an exception explaining that there is none. Overridable for tests. */
     protected GoogleCredentials resolve() {
         if (credentials != null) {
             return credentials

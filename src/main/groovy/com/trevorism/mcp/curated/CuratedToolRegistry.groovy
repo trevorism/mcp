@@ -81,8 +81,6 @@ class CuratedToolRegistry {
         URLEncoder.encode(s, "UTF-8")
     }
 
-    // ---- definitions ---------------------------------------------------------
-
     private static Map objectSchema(String desc) {
         [type: "object", description: desc]
     }
