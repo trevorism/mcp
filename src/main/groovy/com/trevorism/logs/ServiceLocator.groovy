@@ -7,11 +7,6 @@ import jakarta.inject.Singleton
 @Singleton
 class ServiceLocator {
 
-    /** Categories seen across the platform's deploy workflows; each maps to a `trevorism-<category>` project. */
-    static final Set<String> KNOWN_CATEGORIES = [
-            "action", "auth", "cleo", "data", "draw", "gcloud", "memo", "project", "testing", "trade", "trevorism"
-    ].toSet()
-
     private final ServiceRegistry registry
 
     ServiceLocator(ServiceRegistry registry) {

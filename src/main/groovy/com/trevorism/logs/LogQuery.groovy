@@ -67,9 +67,34 @@ class LogQuery {
             clauses.add("\"${escape(contains)}\"".toString())
         }
         if (rawFilter?.trim()) {
+            if (!isSelfContained(rawFilter)) {
+                throw new IllegalArgumentException("'filter' must have balanced parentheses and quotes.")
+            }
             clauses.add("(${rawFilter.trim()})".toString())
         }
         return clauses.join(" AND ")
+    }
+
+    static boolean isSelfContained(String filter) {
+        int depth = 0
+        boolean inQuote = false
+        for (int i = 0; i < filter.length(); i++) {
+            char c = filter.charAt(i)
+            if (inQuote) {
+                if (c == ('\\' as char)) {
+                    i++
+                } else if (c == ('"' as char)) {
+                    inQuote = false
+                }
+            } else if (c == ('"' as char)) {
+                inQuote = true
+            } else if (c == ('(' as char)) {
+                depth++
+            } else if (c == (')' as char) && --depth < 0) {
+                return false
+            }
+        }
+        return depth == 0 && !inQuote
     }
 
     String normalizedSeverity() {

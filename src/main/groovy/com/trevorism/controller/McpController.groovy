@@ -12,6 +12,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.tags.Tag
 
@@ -22,9 +24,11 @@ import io.swagger.v3.oas.annotations.tags.Tag
  *
  * Auth: the caller presents a Trevorism user REFRESH token as the bearer; TokenManager redeems it
  * for a fresh (cached) access token, which is threaded into the tool handlers for per-user downstream
- * calls. A plain access token also works (redeem falls back to using it directly). No bearer -> 401.
+ * calls. A plain access token also works (redeem falls back to using it directly). The resolved token
+ * must verify against the signing key; otherwise -> 401.
  */
 @Controller("/mcp")
+@ExecuteOn(TaskExecutors.BLOCKING)
 class McpController {
 
     private final TrevorismMcpServer server
@@ -39,7 +43,7 @@ class McpController {
     @Operation(summary = "MCP JSON-RPC endpoint (initialize, tools/list, tools/call)")
     @Post(consumes = MediaType.APPLICATION_JSON, produces = MediaType.APPLICATION_JSON)
     HttpResponse<?> rpc(@Body Map request, @Header(HttpHeaders.AUTHORIZATION) @Nullable String authorization) {
-        String accessToken = tokenManager.resolveAccessToken(authorization)
+        String accessToken = tokenManager.authenticate(authorization)
         if (!accessToken) {
             return HttpResponse.unauthorized().body([
                     jsonrpc: "2.0", id: request?.id,

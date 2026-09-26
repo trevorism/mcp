@@ -57,6 +57,20 @@ class LogQueryTest {
     }
 
     @Test
+    void testRawFilterCannotBreakOutOfItsGroup() {
+        assert shouldFail { query([rawFilter: 'x) OR (true']).buildFilter() }.message.contains("balanced")
+        assert shouldFail { query([rawFilter: 'severity>=ERROR)']).buildFilter() }.message.contains("balanced")
+        assert shouldFail { query([rawFilter: '(logName:"stderr"']).buildFilter() }.message.contains("balanced")
+        assert shouldFail { query([rawFilter: 'textPayload:"unterminated']).buildFilter() }.message.contains("balanced")
+    }
+
+    @Test
+    void testRawFilterAllowsBalancedGroupsAndParenthesesInsideQuotes() {
+        assert query([rawFilter: '(severity>=ERROR OR logName:"stderr")']).buildFilter().endsWith('((severity>=ERROR OR logName:"stderr"))')
+        assert query([rawFilter: 'textPayload:"call(x) \\" )"']).buildFilter().endsWith('(textPayload:"call(x) \\" )")')
+    }
+
+    @Test
     void testLimitIsClamped() {
         assert query([limit: 5000]).clampedLimit() == 500
         assert query([limit: 0]).clampedLimit() == 50

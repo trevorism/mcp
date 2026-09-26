@@ -13,14 +13,6 @@ class GoogleTokenProvider {
 
     private volatile GoogleCredentials credentials
 
-    boolean isAvailable() {
-        try {
-            return resolve() != null
-        } catch (Exception ignored) {
-            return false
-        }
-    }
-
     String getAccessToken() {
         GoogleCredentials creds = resolve()
         creds.refreshIfExpired()

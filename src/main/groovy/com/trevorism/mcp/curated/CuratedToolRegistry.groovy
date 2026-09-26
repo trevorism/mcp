@@ -4,6 +4,9 @@ import com.trevorism.client.PassThroughClient
 import groovy.json.JsonOutput
 import jakarta.inject.Singleton
 
+import static com.trevorism.mcp.ToolAnnotations.readOnly
+import static com.trevorism.mcp.ToolAnnotations.writes
+
 @Singleton
 class CuratedToolRegistry {
 
@@ -78,7 +81,7 @@ class CuratedToolRegistry {
     }
 
     private static String encode(String s) {
-        URLEncoder.encode(s, "UTF-8")
+        URLEncoder.encode(s, "UTF-8").replace("+", "%20")
     }
 
     private static Map objectSchema(String desc) {
@@ -89,16 +92,6 @@ class CuratedToolRegistry {
         Map p = [type: "string", description: desc]
         if (enumValues) p['enum'] = enumValues
         return p
-    }
-
-    /** Read-only tool that reaches out to a downstream service. */
-    private static Map readOnly(String title) {
-        [title: title, readOnlyHint: true, openWorldHint: true]
-    }
-
-    /** Mutating tool: {@code destructive} = may overwrite/remove data; {@code idempotent} = repeat is a no-op. */
-    private static Map writes(String title, boolean destructive, boolean idempotent) {
-        [title: title, readOnlyHint: false, destructiveHint: destructive, idempotentHint: idempotent, openWorldHint: true]
     }
 
     private static List<CuratedTool> buildTools() {

@@ -54,6 +54,13 @@ class CuratedToolRegistryTest {
     }
 
     @Test
+    void testSpacesArePercentEncodedAndPlusSignsPreserved() {
+        def rec = new Recorder()
+        reg(rec).call("get_object", [kind: "my app", id: "a+b", datasource: "big query"], "tok")
+        assert rec.calls[0].url == "https://data.trevorism.com/object/my%20app/a%2Bb?datasource=big%20query"
+    }
+
+    @Test
     void testBodyFromObjectArg() {
         def rec = new Recorder()
         reg(rec).call("create_object", [kind: "app", data: [name: "x", n: 1]], "tok")

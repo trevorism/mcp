@@ -86,6 +86,41 @@ class TokenManagerTest {
         assert seen == ["bad-rt", "good-rt"]
     }
 
+    private static TokenManager authenticating(Set<String> validTokens, Closure<String> redeemImpl) {
+        ClaimsInspector inspector = new ClaimsInspector() {
+            @Override
+            boolean isValid(String accessToken) { validTokens.contains(accessToken) }
+        }
+        new TokenManager(inspector) {
+            @Override
+            protected String redeem(String refreshToken) { redeemImpl(refreshToken) }
+        }
+    }
+
+    @Test
+    void testAuthenticateReturnsTheRedeemedAccessTokenWhenValid() {
+        def tm = authenticating(["access-1"] as Set) { "access-1" }
+        assert tm.authenticate("Bearer rt") == "access-1"
+    }
+
+    @Test
+    void testAuthenticateAcceptsAValidPlainAccessToken() {
+        def tm = authenticating(["plain-access"] as Set) { throw new InvalidRequestException(new RuntimeException("nope"), 400) }
+        assert tm.authenticate("Bearer plain-access") == "plain-access"
+    }
+
+    @Test
+    void testAuthenticateRejectsAnUnverifiableBearer() {
+        def tm = authenticating([] as Set) { throw new InvalidRequestException(new RuntimeException("nope"), 400) }
+        assert tm.authenticate("Bearer not-a-token") == null
+    }
+
+    @Test
+    void testAuthenticateRejectsAMissingHeader() {
+        def tm = authenticating(["x"] as Set) { "x" }
+        assert tm.authenticate(null) == null
+    }
+
     @Test
     void testNullOrEmptyHeaderReturnsNull() {
         def tm = withRedeem([]) { "x" }

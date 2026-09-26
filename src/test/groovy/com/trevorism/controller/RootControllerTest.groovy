@@ -9,13 +9,13 @@ class RootControllerTest {
 
     @Test
     void testRootControllerEndpoints(){
-        RootController rootController = new RootController(null, null, null)
+        RootController rootController = new RootController()
         assert rootController.index().getBody().get().contains("/help")
     }
 
     @Test
     void testRootControllerPing(){
-        RootController rootController = new RootController(null, null, null)
+        RootController rootController = new RootController()
         assert rootController.ping() == "pong"
     }
 }
