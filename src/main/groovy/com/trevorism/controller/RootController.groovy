@@ -1,20 +1,10 @@
 package com.trevorism.controller
 
 import com.trevorism.AppVersion
-import com.trevorism.auth.TokenManager
-import com.trevorism.secure.Roles
-import com.trevorism.secure.Secure
-import com.trevorism.service.ServiceRegistry
-import com.trevorism.service.SpecHarvester
-import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
-import io.micronaut.http.annotation.Header
-import io.micronaut.http.annotation.Post
-import io.micronaut.scheduling.TaskExecutors
-import io.micronaut.scheduling.annotation.ExecuteOn
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -24,20 +14,9 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 @Controller("/")
-@ExecuteOn(TaskExecutors.BLOCKING)
 class RootController {
 
     private static final Logger log = LoggerFactory.getLogger(RootController)
-
-    private final ServiceRegistry serviceRegistry
-    private final SpecHarvester specHarvester
-    private final TokenManager tokenManager
-
-    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester, TokenManager tokenManager) {
-        this.serviceRegistry = serviceRegistry
-        this.specHarvester = specHarvester
-        this.tokenManager = tokenManager
-    }
 
     @Tag(name = "Root Operations")
     @Operation(summary = "Context Root of the Application")
@@ -70,16 +49,5 @@ class RootController {
     @Get(value = "/version", produces = MediaType.TEXT_PLAIN)
     String version() {
         return AppVersion.SEMVER
-    }
-
-    @Tag(name = "Root Operations")
-    @Operation(summary = "Force a rebuild of the service registry and spec caches")
-    @Post(value = "/refresh", produces = MediaType.APPLICATION_JSON)
-    @Secure(Roles.USER)
-    Map refresh(@Header(HttpHeaders.AUTHORIZATION) String authorization) {
-        specHarvester.clear()
-        int count = serviceRegistry.refresh(tokenManager.resolveAccessToken(authorization)).size()
-        log.info("Manual refresh resolved ${count} services")
-        return [services: count]
     }
 }

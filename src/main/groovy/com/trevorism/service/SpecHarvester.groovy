@@ -40,10 +40,6 @@ class SpecHarvester {
         return data
     }
 
-    void clear() {
-        cache.clear()
-    }
-
     private Map harvest(String baseUrl) {
         String html = http.get("${baseUrl}/swagger-ui/index.html")
         String specPath = extractSpecPath(html)

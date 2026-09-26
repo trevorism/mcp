@@ -98,11 +98,6 @@ class ServiceRegistry {
         return resolved
     }
 
-    void clear() {
-        cache = null
-        cachedAt = 0L
-    }
-
     private Discovery resolveAll(List<String> names, String bearer) {
         Discovery discovery = new Discovery()
         if (names.isEmpty()) return discovery
