@@ -31,10 +31,12 @@ class RootController {
 
     private final ServiceRegistry serviceRegistry
     private final SpecHarvester specHarvester
+    private final TokenManager tokenManager
 
-    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester) {
+    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester, TokenManager tokenManager) {
         this.serviceRegistry = serviceRegistry
         this.specHarvester = specHarvester
+        this.tokenManager = tokenManager
     }
 
     @Tag(name = "Root Operations")
@@ -76,7 +78,7 @@ class RootController {
     @Secure(Roles.USER)
     Map refresh(@Header(HttpHeaders.AUTHORIZATION) String authorization) {
         specHarvester.clear()
-        int count = serviceRegistry.refresh(TokenManager.bearerFrom(authorization)).size()
+        int count = serviceRegistry.refresh(tokenManager.resolveAccessToken(authorization)).size()
         log.info("Manual refresh resolved ${count} services")
         return [services: count]
     }

@@ -1,5 +1,6 @@
 package com.trevorism.controller
 
+import com.trevorism.auth.TokenManager
 import com.trevorism.model.ServiceEntry
 import com.trevorism.service.ServiceRegistry
 import com.trevorism.service.SpecHarvester
@@ -12,18 +13,18 @@ class RootControllerTest {
 
     @Test
     void testRootControllerEndpoints(){
-        RootController rootController = new RootController(null, null)
+        RootController rootController = new RootController(null, null, null)
         assert rootController.index().getBody().get().contains("/help")
     }
 
     @Test
     void testRootControllerPing(){
-        RootController rootController = new RootController(null, null)
+        RootController rootController = new RootController(null, null, null)
         assert rootController.ping() == "pong"
     }
 
     @Test
-    void testRefreshClearsSpecsAndRebuildsWithTheCallersToken() {
+    void testRefreshClearsSpecsAndRebuildsWithTheRedeemedAccessToken() {
         List<String> seenTokens = []
         boolean[] specsCleared = [false]
         ServiceRegistry registry = new ServiceRegistry() {
@@ -38,7 +39,14 @@ class RootControllerTest {
             void clear() { specsCleared[0] = true }
         }
 
-        Map result = new RootController(registry, harvester).refresh("Bearer access-token")
+        TokenManager tokenManager = new TokenManager() {
+            @Override
+            protected String redeem(String refreshToken) {
+                return refreshToken == "refresh-token" ? "access-token" : null
+            }
+        }
+
+        Map result = new RootController(registry, harvester, tokenManager).refresh("Bearer refresh-token")
 
         assert result == [services: 1]
         assert seenTokens == ["access-token"]
