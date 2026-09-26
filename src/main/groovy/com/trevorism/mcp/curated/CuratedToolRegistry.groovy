@@ -81,7 +81,7 @@ class CuratedToolRegistry {
     }
 
     private static String encode(String s) {
-        URLEncoder.encode(s, "UTF-8")
+        URLEncoder.encode(s, "UTF-8").replace("+", "%20")
     }
 
     private static Map objectSchema(String desc) {

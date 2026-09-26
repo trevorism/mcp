@@ -35,7 +35,7 @@ class TokenManager {
     }
 
     String resolveAccessToken(String authorizationHeader) {
-        String bearer = strip(authorizationHeader)
+        String bearer = bearerFrom(authorizationHeader)
         if (!bearer) {
             return null
         }
@@ -79,7 +79,7 @@ class TokenManager {
         cache.entrySet().removeIf { it.value.isExpired() }
     }
 
-    private static String strip(String header) {
+    static String bearerFrom(String header) {
         if (!header) return null
         String h = header.trim()
         if (h.toLowerCase().startsWith("bearer")) {

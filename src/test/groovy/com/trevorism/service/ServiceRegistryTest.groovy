@@ -131,6 +131,36 @@ class ServiceRegistryTest {
     }
 
     @Test
+    void testResultIsNotCachedWhenSomeLookupsAreDeniedForTheCaller() {
+        AtomicInteger fetches = new AtomicInteger()
+        def reg = new ServiceRegistry() {
+            @Override
+            protected List<String> fetchActiveNames() { fetches.incrementAndGet(); ["data", "secret"] }
+            @Override
+            protected String fetchCategory(String name, String bearer) {
+                if (name == "secret") throw new ServiceRegistry.LookupDeniedException(name, 403)
+                return "data"
+            }
+        }
+
+        assert reg.listServices("low-permission").collect { it.name } == ["data"]
+        reg.listServices("low-permission")
+
+        assert fetches.get() == 2
+    }
+
+    @Test
+    void testByNameReturnsNullWhenTheLookupIsDenied() {
+        def reg = new ServiceRegistry() {
+            @Override
+            protected List<String> fetchActiveNames() { [] }
+            @Override
+            protected String fetchCategory(String name, String bearer) { throw new ServiceRegistry.LookupDeniedException(name, 401) }
+        }
+        assert reg.byName("secret", "tok") == null
+    }
+
+    @Test
     void testExplicitRefreshAlwaysRebuilds() {
         AtomicInteger fetches = new AtomicInteger()
         def reg = new ServiceRegistry() {

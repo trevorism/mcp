@@ -37,3 +37,18 @@ Then(/the API returns a link to the help page/) { ->
 Then(/pong is returned, to indicate the service is alive/) { ->
     assert pingContent == "pong"
 }
+
+def refreshRejected = false
+
+When(/an unauthenticated refresh is requested/) { ->
+    try {
+        new com.trevorism.http.JsonHttpClient().post("${baseUrl}/refresh", "")
+        refreshRejected = false
+    } catch (Exception ignored) {
+        refreshRejected = true
+    }
+}
+
+Then(/the refresh is rejected/) { ->
+    assert refreshRejected
+}

@@ -2,9 +2,10 @@ package com.trevorism.controller
 
 import com.trevorism.AppVersion
 import com.trevorism.auth.TokenManager
+import com.trevorism.secure.Roles
+import com.trevorism.secure.Secure
 import com.trevorism.service.ServiceRegistry
 import com.trevorism.service.SpecHarvester
-import io.micronaut.core.annotation.Nullable
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -30,12 +31,10 @@ class RootController {
 
     private final ServiceRegistry serviceRegistry
     private final SpecHarvester specHarvester
-    private final TokenManager tokenManager
 
-    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester, TokenManager tokenManager) {
+    RootController(ServiceRegistry serviceRegistry, SpecHarvester specHarvester) {
         this.serviceRegistry = serviceRegistry
         this.specHarvester = specHarvester
-        this.tokenManager = tokenManager
     }
 
     @Tag(name = "Root Operations")
@@ -74,14 +73,11 @@ class RootController {
     @Tag(name = "Root Operations")
     @Operation(summary = "Force a rebuild of the service registry and spec caches")
     @Post(value = "/refresh", produces = MediaType.APPLICATION_JSON)
-    HttpResponse<Map> refresh(@Header(HttpHeaders.AUTHORIZATION) @Nullable String authorization) {
-        String accessToken = tokenManager.authenticate(authorization)
-        if (!accessToken) {
-            return HttpResponse.<Map>unauthorized().body([error: "Missing or invalid Authorization bearer token"])
-        }
+    @Secure(Roles.USER)
+    Map refresh(@Header(HttpHeaders.AUTHORIZATION) String authorization) {
         specHarvester.clear()
-        int count = serviceRegistry.refresh(accessToken).size()
+        int count = serviceRegistry.refresh(TokenManager.bearerFrom(authorization)).size()
         log.info("Manual refresh resolved ${count} services")
-        return HttpResponse.ok([services: count] as Map)
+        return [services: count]
     }
 }

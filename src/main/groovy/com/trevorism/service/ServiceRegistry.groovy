@@ -9,6 +9,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import java.util.concurrent.Callable
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -78,7 +79,8 @@ class ServiceRegistry {
         List<String> names = fetchActiveNames()
         log.info("Resolving ${names.size()} services from active")
 
-        List<ServiceEntry> resolved = resolveAll(names, bearer)
+        Discovery discovery = resolveAll(names, bearer)
+        List<ServiceEntry> resolved = discovery.entries
 
         if (resolved.isEmpty() && !names.isEmpty()) {
             throw new IllegalStateException(
@@ -86,6 +88,10 @@ class ServiceRegistry {
         }
 
         resolved.sort { it.name }
+        if (discovery.denied) {
+            log.warn("Resolved ${resolved.size()}/${names.size()} services, but some lookups were denied for this caller; not caching")
+            return resolved
+        }
         cache = resolved
         cachedAt = System.currentTimeMillis()
         log.info("Resolved ${resolved.size()}/${names.size()} services")
@@ -97,14 +103,24 @@ class ServiceRegistry {
         cachedAt = 0L
     }
 
-    private List<ServiceEntry> resolveAll(List<String> names, String bearer) {
-        if (names.isEmpty()) return []
+    private Discovery resolveAll(List<String> names, String bearer) {
+        Discovery discovery = new Discovery()
+        if (names.isEmpty()) return discovery
         ExecutorService pool = Executors.newFixedThreadPool(Math.min(MAX_THREADS, names.size()))
         try {
             List<Future<ServiceEntry>> futures = names.collect { String name ->
-                pool.submit({ resolveOne(name, bearer) } as Callable<ServiceEntry>)
+                pool.submit({ lookup(name, bearer) } as Callable<ServiceEntry>)
             }
-            return futures.collect { it.get() }.findAll { it != null }
+            futures.each { Future<ServiceEntry> future ->
+                try {
+                    ServiceEntry entry = future.get()
+                    if (entry) discovery.entries << entry
+                } catch (ExecutionException e) {
+                    if (!(e.cause instanceof LookupDeniedException)) throw e
+                    discovery.denied = true
+                }
+            }
+            return discovery
         } finally {
             pool.shutdown()
         }
@@ -117,11 +133,22 @@ class ServiceRegistry {
 
     private ServiceEntry resolveOne(String name, String bearer) {
         try {
+            return lookup(name, bearer)
+        } catch (LookupDeniedException e) {
+            log.debug(e.message)
+            return null
+        }
+    }
+
+    private ServiceEntry lookup(String name, String bearer) {
+        try {
             String category = fetchCategory(name, bearer)
             if (!category || category == "null") {
                 return null
             }
             return new ServiceEntry(name, buildHost(name, category), category)
+        } catch (LookupDeniedException e) {
+            throw e
         } catch (Exception e) {
             log.debug("Could not resolve ${name}: ${e.message}")
             return null
@@ -136,8 +163,7 @@ class ServiceRegistry {
                 return parsed?.dns as String
             } catch (InvalidRequestException e) {
                 if (e.statusCode == 401 || e.statusCode == 403) {
-                    log.debug("Category lookup unauthorized (${e.statusCode}) for ${name}")
-                    return null
+                    throw new LookupDeniedException(name, e.statusCode)
                 }
                 log.debug("Category lookup for ${name} failed (attempt ${attempt}, ${e.statusCode})")
             } catch (Exception e) {
@@ -160,5 +186,16 @@ class ServiceRegistry {
         return DEFAULT_SERVICES.contains(name) ?
                 "https://${category}.trevorism.com" :
                 "https://${name}.${category}.trevorism.com"
+    }
+
+    static class LookupDeniedException extends RuntimeException {
+        LookupDeniedException(String name, int status) {
+            super("Category lookup for ${name} denied (${status})".toString())
+        }
+    }
+
+    private static class Discovery {
+        List<ServiceEntry> entries = []
+        boolean denied
     }
 }

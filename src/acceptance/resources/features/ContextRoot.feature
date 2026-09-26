@@ -10,3 +10,8 @@ Feature: Context Root of this API
     Given the mcp application is alive
     When I navigate to /ping on https://mcp.project.trevorism.com
     Then pong is returned, to indicate the service is alive
+
+  Scenario: Refresh requires authentication
+    Given the mcp application is alive
+    When an unauthenticated refresh is requested
+    Then the refresh is rejected
