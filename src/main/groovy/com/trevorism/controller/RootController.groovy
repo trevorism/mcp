@@ -12,6 +12,8 @@ import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Header
 import io.micronaut.http.annotation.Post
+import io.micronaut.scheduling.TaskExecutors
+import io.micronaut.scheduling.annotation.ExecuteOn
 import io.swagger.v3.oas.annotations.Operation
 import io.swagger.v3.oas.annotations.media.Content
 import io.swagger.v3.oas.annotations.media.Schema
@@ -21,6 +23,7 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 @Controller("/")
+@ExecuteOn(TaskExecutors.BLOCKING)
 class RootController {
 
     private static final Logger log = LoggerFactory.getLogger(RootController)
@@ -71,14 +74,14 @@ class RootController {
     @Tag(name = "Root Operations")
     @Operation(summary = "Force a rebuild of the service registry and spec caches")
     @Post(value = "/refresh", produces = MediaType.APPLICATION_JSON)
-    Map refresh(@Header(HttpHeaders.AUTHORIZATION) @Nullable String authorization) {
-        String accessToken = tokenManager.resolveAccessToken(authorization)
+    HttpResponse<Map> refresh(@Header(HttpHeaders.AUTHORIZATION) @Nullable String authorization) {
+        String accessToken = tokenManager.authenticate(authorization)
         if (!accessToken) {
-            return [error: "Missing or invalid Authorization bearer token"]
+            return HttpResponse.<Map>unauthorized().body([error: "Missing or invalid Authorization bearer token"])
         }
         specHarvester.clear()
         int count = serviceRegistry.refresh(accessToken).size()
         log.info("Manual refresh resolved ${count} services")
-        return [services: count]
+        return HttpResponse.ok([services: count] as Map)
     }
 }

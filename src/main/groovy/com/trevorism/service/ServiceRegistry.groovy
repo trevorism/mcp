@@ -54,22 +54,24 @@ class ServiceRegistry {
     private volatile long cachedAt = 0L
 
     List<ServiceEntry> listServices(String bearer) {
-        List<ServiceEntry> current = cache
-        if (current != null && (System.currentTimeMillis() - cachedAt) < TTL_MILLIS) {
-            return current
-        }
-        return refresh(bearer)
+        List<ServiceEntry> current = freshCache()
+        return current != null ? current : refreshIfStale(bearer)
     }
 
     ServiceEntry byName(String name, String bearer) {
-        ServiceEntry cached = findCached(name)
+        ServiceEntry cached = freshCache()?.find { it.name == name }
         return cached ?: resolveOne(name, bearer)
     }
 
-    private ServiceEntry findCached(String name) {
+    private List<ServiceEntry> freshCache() {
         List<ServiceEntry> current = cache
         boolean fresh = current != null && (System.currentTimeMillis() - cachedAt) < TTL_MILLIS
-        return fresh ? current.find { it.name == name } : null
+        return fresh ? current : null
+    }
+
+    private synchronized List<ServiceEntry> refreshIfStale(String bearer) {
+        List<ServiceEntry> current = freshCache()
+        return current != null ? current : refresh(bearer)
     }
 
     synchronized List<ServiceEntry> refresh(String bearer) {

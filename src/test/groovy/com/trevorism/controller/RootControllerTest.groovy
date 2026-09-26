@@ -1,5 +1,8 @@
 package com.trevorism.controller
 
+import com.trevorism.auth.TokenManager
+import io.micronaut.http.HttpResponse
+import io.micronaut.http.HttpStatus
 import org.junit.jupiter.api.Test
 
 /**
@@ -17,5 +20,18 @@ class RootControllerTest {
     void testRootControllerPing(){
         RootController rootController = new RootController(null, null, null)
         assert rootController.ping() == "pong"
+    }
+
+    @Test
+    void testRefreshWithoutAValidTokenIsUnauthorized() {
+        TokenManager rejectingTokenManager = new TokenManager() {
+            @Override
+            String authenticate(String authorizationHeader) { null }
+        }
+        RootController rootController = new RootController(null, null, rejectingTokenManager)
+
+        HttpResponse<Map> response = rootController.refresh("Bearer not-a-token")
+
+        assert HttpStatus.UNAUTHORIZED == response.status()
     }
 }

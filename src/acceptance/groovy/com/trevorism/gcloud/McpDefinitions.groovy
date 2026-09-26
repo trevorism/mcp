@@ -56,6 +56,16 @@ When(/an unauthenticated request is sent to the mcp endpoint/) { ->
     }
 }
 
+When(/a request with a forged bearer token is sent to the mcp endpoint/) { ->
+    try {
+        new JsonHttpClient().post(MCP_URL, '{"jsonrpc":"2.0","id":6,"method":"tools/list"}',
+                ["Authorization": "Bearer not-a-token"])
+        rejected = false
+    } catch (Exception ignored) {
+        rejected = true
+    }
+}
+
 Then(/the request is rejected/) { ->
     assert rejected
 }

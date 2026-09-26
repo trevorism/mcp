@@ -3,6 +3,7 @@ package com.trevorism.auth
 import com.trevorism.http.JsonHttpClient
 import com.trevorism.http.util.InvalidRequestException
 import groovy.json.JsonOutput
+import jakarta.inject.Inject
 import jakarta.inject.Singleton
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -19,6 +20,19 @@ class TokenManager {
 
     private final JsonHttpClient http = new JsonHttpClient()
     private final Map<String, CachedToken> cache = new ConcurrentHashMap<>()
+    private ClaimsInspector claimsInspector
+
+    @Inject
+    TokenManager(ClaimsInspector claimsInspector) {
+        this.claimsInspector = claimsInspector
+    }
+
+    protected TokenManager() {}
+
+    String authenticate(String authorizationHeader) {
+        String accessToken = resolveAccessToken(authorizationHeader)
+        return accessToken && claimsInspector.isValid(accessToken) ? accessToken : null
+    }
 
     String resolveAccessToken(String authorizationHeader) {
         String bearer = strip(authorizationHeader)

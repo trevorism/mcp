@@ -3,6 +3,12 @@ package com.trevorism.service
 import com.trevorism.model.ServiceEntry
 import org.junit.jupiter.api.Test
 
+import java.util.concurrent.Callable
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.atomic.AtomicInteger
+
 class ServiceRegistryTest {
 
     /** Registry whose HTTP boundary is faked: names + categories are fixed. */
@@ -103,5 +109,38 @@ class ServiceRegistryTest {
         reg.listServices("tok")
         reg.listServices("tok")
         assert fetches[0] == 1  // second call served from the in-memory cache, not re-resolved
+    }
+
+    @Test
+    void testConcurrentCallersOnAStaleCacheTriggerASingleRefresh() {
+        AtomicInteger fetches = new AtomicInteger()
+        def reg = new ServiceRegistry() {
+            @Override
+            protected List<String> fetchActiveNames() { fetches.incrementAndGet(); Thread.sleep(100); ["data"] }
+            @Override
+            protected String fetchCategory(String name, String bearer) { "data" }
+        }
+        ExecutorService pool = Executors.newFixedThreadPool(5)
+        try {
+            List<Future> futures = (1..5).collect { pool.submit({ reg.listServices("tok") } as Callable) }
+            futures.each { it.get() }
+        } finally {
+            pool.shutdown()
+        }
+        assert fetches.get() == 1
+    }
+
+    @Test
+    void testExplicitRefreshAlwaysRebuilds() {
+        AtomicInteger fetches = new AtomicInteger()
+        def reg = new ServiceRegistry() {
+            @Override
+            protected List<String> fetchActiveNames() { fetches.incrementAndGet(); ["data"] }
+            @Override
+            protected String fetchCategory(String name, String bearer) { "data" }
+        }
+        reg.listServices("tok")
+        reg.refresh("tok")
+        assert fetches.get() == 2
     }
 }

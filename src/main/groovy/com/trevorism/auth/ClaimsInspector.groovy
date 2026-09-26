@@ -18,8 +18,17 @@ class ClaimsInspector {
 
     protected ClaimsInspector() {}
 
+    boolean isValid(String accessToken) {
+        try {
+            ClaimsProvider.getClaims(accessToken, signingKey())
+            return true
+        } catch (Exception ignored) {
+            return false
+        }
+    }
+
     Map inspect(String accessToken) {
-        ClaimProperties claims = ClaimsProvider.getClaims(accessToken, propertiesProvider.getProperty("signingKey"))
+        ClaimProperties claims = ClaimsProvider.getClaims(accessToken, signingKey())
         return [
                 subject    : claims.subject,
                 id         : claims.id,
@@ -30,5 +39,9 @@ class ClaimsInspector {
                 audience   : claims.audience as List,
                 issuer     : claims.issuer
         ]
+    }
+
+    protected String signingKey() {
+        propertiesProvider.getProperty("signingKey")
     }
 }

@@ -21,4 +21,11 @@ class HostAllowlistTest {
         assert !HostAllowlist.isAllowed("not a url")
         assert !HostAllowlist.isAllowed(null)
     }
+
+    @Test
+    void testRejectsNonHttpsSchemes() {
+        assert !HostAllowlist.isAllowed("http://data.trevorism.com/object")
+        assert !HostAllowlist.isAllowed("ftp://data.trevorism.com/object")
+        assert !HostAllowlist.isAllowed("//data.trevorism.com/object")
+    }
 }

@@ -16,12 +16,14 @@ import jakarta.inject.Singleton
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import static com.trevorism.mcp.ToolAnnotations.readOnly
+
 /**
  * Hand-rolled MCP server core (tools-only). Speaks JSON-RPC 2.0; the transport
  * (McpController) is responsible only for HTTP framing.
  *
  * The caller's bearer token is threaded in from the controller: discovery tools use it for the
- * @Secure category lookups, while ping/call go through the request-scoped pass-through client.
+ * @Secure category lookups, while ping/call forward it through PassThroughClient.
  */
 @Singleton
 class TrevorismMcpServer {
@@ -88,11 +90,6 @@ class TrevorismMcpServer {
                 capabilities   : [tools: [listChanged: false]],
                 serverInfo     : [name: "trevorism-mcp", version: AppVersion.SEMVER]
         ]
-    }
-
-    /** A read-only tool that reaches out to external services. */
-    private static Map readOnly(String title) {
-        [title: title, readOnlyHint: true, openWorldHint: true]
     }
 
     private static List<Map> toolDefinitions() {

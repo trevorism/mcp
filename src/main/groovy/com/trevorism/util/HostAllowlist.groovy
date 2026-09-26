@@ -9,8 +9,9 @@ class HostAllowlist {
 
     static boolean isAllowed(String url) {
         try {
-            String host = new URI(url).host?.toLowerCase()
-            return host != null && (host == DOMAIN || host.endsWith("." + DOMAIN))
+            URI uri = new URI(url)
+            String host = uri.host?.toLowerCase()
+            return "https".equalsIgnoreCase(uri.scheme) && host != null && (host == DOMAIN || host.endsWith("." + DOMAIN))
         } catch (Exception ignored) {
             return false
         }

@@ -13,6 +13,10 @@ Feature: MCP endpoint
     When an unauthenticated request is sent to the mcp endpoint
     Then the request is rejected
 
+  Scenario: Requests with an unverifiable bearer token are rejected
+    When a request with a forged bearer token is sent to the mcp endpoint
+    Then the request is rejected
+
   Scenario: Google cloud logs are readable for a deployed service
     When an authenticated request reads the gcloud logs for the mcp service
     Then log entries are returned without error
