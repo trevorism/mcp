@@ -14,7 +14,7 @@ import java.util.regex.Pattern
  * Harvests a service's OpenAPI spec and summarizes it to a token-cheap operation list.
  *
  * Flow: GET {base}/swagger-ui/index.html -> parse the `url: '.../swagger/<title>-<ver>.yml'`
- * reference -> fetch that YAML -> summarize {title, version, operations:[{method, path, summary, secured}]}.
+ * reference -> fetch that YAML -> summarize {title, version, operations:[{method, path, summary, markedSecure}]}.
  * Cached per base URL with a TTL.
  */
 @Singleton
@@ -66,10 +66,10 @@ class SpecHarvester {
                     if (HTTP_METHODS.contains((method as String).toLowerCase()) && op instanceof Map) {
                         String summary = (op as Map).summary as String
                         operations << [
-                                method : (method as String).toUpperCase(),
-                                path   : path as String,
-                                summary: summary,
-                                secured: (summary ?: "").contains("Secure")
+                                method      : (method as String).toUpperCase(),
+                                path        : path as String,
+                                summary     : summary,
+                                markedSecure: (summary ?: "").contains("Secure")
                         ]
                     }
                 }

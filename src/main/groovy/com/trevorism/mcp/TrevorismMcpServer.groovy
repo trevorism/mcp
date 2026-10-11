@@ -102,8 +102,10 @@ class TrevorismMcpServer {
                 ],
                 [
                         name       : "describe_service",
-                        description: "Summarize a service's API operations (method, path, whether it needs auth) " +
-                                "from its OpenAPI spec. Give a service name, or a baseUrl directly.",
+                        description: "Summarize a service's API operations (method, path, summary, markedSecure) " +
+                                "from its OpenAPI spec. Give a service name, or a baseUrl directly. " +
+                                "markedSecure only means the summary text says '**Secure'; specs carry no security data, " +
+                                "so it does not tell you whether a route enforces auth. Read the controller's @Secure for that.",
                         inputSchema: [type      : "object",
                                       properties: [
                                               name   : [type: "string", description: "Service name, e.g. 'data'"],
