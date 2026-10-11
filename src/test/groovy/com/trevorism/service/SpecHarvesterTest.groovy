@@ -23,7 +23,7 @@ class SpecHarvesterTest {
     }
 
     @Test
-    void testSummarizeExtractsOperationsAndSecuredFlag() {
+    void testSummarizeExtractsOperationsAndMarkedSecureFlag() {
         Map spec = [
                 info : [title: "Data", version: "0.9.0"],
                 paths: [
@@ -38,12 +38,12 @@ class SpecHarvesterTest {
         assert result.version == "0.9.0"
         assert result.operations.size() == 3
 
-        def secured = result.operations.find { it.path == "/object/" }
-        assert secured.method == "GET"
-        assert secured.secured == true
+        def marked = result.operations.find { it.path == "/object/" }
+        assert marked.method == "GET"
+        assert marked.markedSecure == true
 
-        def open = result.operations.find { it.path == "/ping" }
-        assert open.secured == false
+        def unmarked = result.operations.find { it.path == "/ping" }
+        assert unmarked.markedSecure == false
     }
 
     @Test
