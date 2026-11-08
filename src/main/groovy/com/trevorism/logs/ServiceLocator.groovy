@@ -21,8 +21,10 @@ class ServiceLocator {
         return [project: projectFor(entry.category), module: moduleFor(entry)]
     }
 
+    private static final Set<String> BARE_PROJECT_CATEGORIES = ["trevorism", "www"] as Set
+
     private static String projectFor(String category) {
-        return category == "trevorism" ? "trevorism" : "trevorism-${category}".toString()
+        return category in BARE_PROJECT_CATEGORIES ? "trevorism" : "trevorism-${category}".toString()
     }
 
     private static String moduleFor(ServiceEntry entry) {
