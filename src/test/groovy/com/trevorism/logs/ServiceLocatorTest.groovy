@@ -50,6 +50,13 @@ class ServiceLocatorTest {
     }
 
     @Test
+    void testHomepageResolvesToBareTrevorismProject() {
+        def result = locator([new ServiceEntry("homepage", "https://www.trevorism.com", "www")])
+                .locate("homepage", "tok")
+        assert result == [project: "trevorism", module: "default"]
+    }
+
+    @Test
     void testUnknownServiceReturnsNullRatherThanGuessing() {
         assert locator([]).locate("nope", "tok") == null
     }
