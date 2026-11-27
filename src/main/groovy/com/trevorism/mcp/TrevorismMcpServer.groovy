@@ -31,6 +31,8 @@ class TrevorismMcpServer {
     private static final Logger log = LoggerFactory.getLogger(TrevorismMcpServer)
     private static final String PROTOCOL_VERSION = "2025-06-18"
     private static final Set<String> SUPPORTED_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"].toSet()
+    private static final List<String> PING_PATHS = ["/ping", "/api/ping"]
+    private static final int MAX_FAILURE_DETAIL = 200
 
     private final ServiceRegistry registry
     private final SpecHarvester specHarvester
@@ -124,7 +126,8 @@ class TrevorismMcpServer {
                 ],
                 [
                         name       : "ping_service",
-                        description: "Liveness check for a service: GET {baseUrl}/ping, expects 'pong'.",
+                        description: "Liveness check for a service: GET {baseUrl}/ping, falling back to {baseUrl}/api/ping " +
+                                "for frontend apps; expects 'pong' and reports which path answered.",
                         inputSchema: [type: "object", properties: [baseUrl: [type: "string"]], required: ["baseUrl"]],
                         annotations: readOnly("Ping service")
                 ],
@@ -192,7 +195,7 @@ class TrevorismMcpServer {
             case "describe_service":
                 return describeService(args, bearer)
             case "ping_service":
-                return passThroughClient.callApi("GET", "${args.baseUrl}/ping", null, bearer)
+                return pingService(args.baseUrl as String, bearer)
             case "call_trevorism_api":
                 String url = "${args.baseUrl}${args.path}"
                 return passThroughClient.callApi((args.method ?: "GET") as String, url, toJsonBody(args.body), bearer)
@@ -229,6 +232,22 @@ class TrevorismMcpServer {
             return PassThroughClient.toolError("Refused: '${baseUrl}' is not a Trevorism (*.trevorism.com) host")
         }
         return PassThroughClient.toolText(JsonOutput.toJson(specHarvester.describe(baseUrl)))
+    }
+
+    private Map pingService(String baseUrl, String bearer) {
+        if (!HostAllowlist.isAllowed(baseUrl)) {
+            return PassThroughClient.toolError("Refused: '${baseUrl}' is not a Trevorism (*.trevorism.com) host")
+        }
+        List<String> failures = []
+        for (String path : PING_PATHS) {
+            Map response = passThroughClient.callApi("GET", "${baseUrl}${path}", null, bearer)
+            String text = response.content[0].text as String
+            if (!response.isError && text?.trim() == "pong") {
+                return PassThroughClient.toolText("pong via ${path}")
+            }
+            failures << "${path} -> ${text?.take(MAX_FAILURE_DETAIL)}".toString()
+        }
+        return PassThroughClient.toolError("No pong from ${baseUrl}: ${failures.join('; ')}")
     }
 
     private Map readLogs(Map args, String bearer) {
