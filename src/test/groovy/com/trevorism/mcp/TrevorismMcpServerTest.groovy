@@ -39,6 +39,22 @@ class TrevorismMcpServerTest {
         }
     }
 
+    private static PassThroughClient scriptedPassThrough(List<String> urls, Map<String, Map> responsesByUrl) {
+        new PassThroughClient() {
+            @Override
+            Map callApi(String method, String url, String body, String accessToken) {
+                urls << url
+                return responsesByUrl[url] ?: PassThroughClient.toolError("Downstream 404: Not Found")
+            }
+        }
+    }
+
+    private static Map ping(TrevorismMcpServer s, String baseUrl) {
+        s.handle([
+                jsonrpc: "2.0", id: 60, method: "tools/call",
+                params : [name: "ping_service", arguments: [baseUrl: baseUrl]]], "tok").result as Map
+    }
+
     private static ClaimsInspector stubInspector() {
         new ClaimsInspector() {
             @Override
@@ -314,5 +330,59 @@ class TrevorismMcpServerTest {
                                       method : "GET",
                                       path   : "/api/entry"]]], "tok")
         assert calls[0].body == null
+    }
+
+    @Test
+    void testPingServiceAnswersOnPing() {
+        List<String> urls = []
+        def passThrough = scriptedPassThrough(urls, ["https://data.trevorism.com/ping": PassThroughClient.toolText("pong")])
+        Map result = ping(server(stubRegistry([]), stubHarvester([:]), passThrough), "https://data.trevorism.com")
+        assert result.isError == false
+        assert result.content[0].text == "pong via /ping"
+        assert urls == ["https://data.trevorism.com/ping"]
+    }
+
+    @Test
+    void testPingServiceFallsBackToApiPing() {
+        List<String> urls = []
+        def passThrough = scriptedPassThrough(urls,
+                ["https://goals.project.trevorism.com/api/ping": PassThroughClient.toolText("pong")])
+        Map result = ping(server(stubRegistry([]), stubHarvester([:]), passThrough), "https://goals.project.trevorism.com")
+        assert result.isError == false
+        assert result.content[0].text == "pong via /api/ping"
+        assert urls == ["https://goals.project.trevorism.com/ping", "https://goals.project.trevorism.com/api/ping"]
+    }
+
+    @Test
+    void testPingServiceFallsBackWhenPingReturnsNonPongBody() {
+        List<String> urls = []
+        def passThrough = scriptedPassThrough(urls, [
+                "https://goals.project.trevorism.com/ping"    : PassThroughClient.toolText("<html>app</html>"),
+                "https://goals.project.trevorism.com/api/ping": PassThroughClient.toolText("pong")])
+        Map result = ping(server(stubRegistry([]), stubHarvester([:]), passThrough), "https://goals.project.trevorism.com")
+        assert result.isError == false
+        assert result.content[0].text == "pong via /api/ping"
+    }
+
+    @Test
+    void testPingServiceFailsWhenNeitherPathAnswers() {
+        List<String> urls = []
+        def passThrough = scriptedPassThrough(urls, [:])
+        Map result = ping(server(stubRegistry([]), stubHarvester([:]), passThrough), "https://down.project.trevorism.com")
+        assert result.isError == true
+        String text = result.content[0].text
+        assert text.startsWith("No pong from https://down.project.trevorism.com")
+        assert text.contains("/ping -> Downstream 404")
+        assert text.contains("/api/ping -> Downstream 404")
+        assert urls.size() == 2
+    }
+
+    @Test
+    void testPingServiceRejectsNonTrevorismHost() {
+        List<String> urls = []
+        Map result = ping(server(stubRegistry([]), stubHarvester([:]), scriptedPassThrough(urls, [:])), "https://evil.com")
+        assert result.isError == true
+        assert result.content[0].text.contains("Refused")
+        assert urls.isEmpty()
     }
 }
